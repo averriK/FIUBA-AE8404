@@ -365,4 +365,23 @@ Las figuras que siguen presentan los resultados del entrenamiento de un modelo d
 ## Discusión de Resultados
 
 
+https://topepo.github.io/caret/
 
+https://bookdown.org/egarpor/PM-UC3M/
+
+bagging
+https://bradleyboehmke.github.io/HOML/
+
+https://github.com/topepo/APM_Figures
+
+Smooth spectra:
+https://guifh.github.io/RNIR 
+
+https://glmnet.stanford.edu/index.html
+https://glmnet.stanford.edu/articles/glmnet.html
+
+Elastic Net
+
+https://bookdown.org/egarpor/PM-UC3M/glm-shrink.html
+
+https://bradleyboehmke.github.io/HOML/knn.html
