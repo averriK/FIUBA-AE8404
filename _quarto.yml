@@ -1,0 +1,87 @@
+project:
+  type: book
+  output-dir: "_output"
+execute: 
+  eval: true
+  echo: true
+  warning: false
+  include: false
+  freeze: false
+editor: 
+  mode: source
+book:
+  subtitle: "Ing. Jemina García"
+  title: "Aprendizaje Estadístico (AE8404)"
+  author: 
+    - "Alejandro Verri Kozlowski. "
+    - "Ing. Civil. Aspirante de Doctorado en Ingeniería (FIUBA) "
+    
+  chapters:
+    - index.qmd
+  #   - qmd/_intro.qmd
+  #   - qmd/_step.qmd
+  #   - qmd/_pca.qmd
+  #   - qmd/_glmnet.qmd
+  #   - qmd/_svm.qmd
+  #   - qmd/_trees.qmd
+  #   - qmd/_boost.qmd
+  #   - qmd/_bagg.qmd
+  #   - qmd/_knn.qmd
+  #   - qmd/_rf.qmd
+    - qmd/references.qmd
+    
+    
+  # appendices: 
+    
+    
+    
+  downloads: [docx, pdf]
+  search: 
+    location: sidebar
+    type: textbox
+
+bibliography: bib/bibliography.bib
+# filters:
+#   - section-bibliographies
+# reference-section-title: Referencias
+citeproc: true
+
+
+crossref:
+  fig-title: "Figura"     # (default is "Figure")
+  tbl-title: "Tabla"     # (default is "Table")
+  eq-title: "Ecuacion"     # (default is "Table")
+  title-delim: ":"     # (default is ":")
+  chapters: true
+
+format:
+  html:
+    reference-location: margin
+    citation-location: margin
+    code-fold: true
+    code-summary: "Mostrar código R"
+    # embed-resources: true
+    # self-contained-math: true
+    page-layout: article # article,full
+    toc: true
+    number-sections: false
+    grid: 
+      body-width: 1600px
+      sidebar-width: 300px
+      margin-width: 300px
+    toc-location: left
+    self-contained: false
+    css: css/styles.css
+    theme: slate #default,cerulean,cosmo,cyborg,darkly,flatly,journal,litera,lumen,lux,materia,minty,morph,pulse,quartz,sandstone,simplex,sketchy,slate,solar,spacelab,superhero,united,vapor,yeti,zephyr
+  # docx:
+  #   toc: true
+  #   number-sections: false
+  #   highlight-style: github
+  #   reference-doc: D:/git/AR-PSHA/docx/reference-doc.docx
+
+#https://github.com/quarto-dev/quarto-cli/blob/main/src/resources/language/_language.yml
+
+colorlinks: true #https://www.njtierney.com/post/2022/04/11/rmd-to-qmd/
+link-citations: true
+fontsize: 11pt
+

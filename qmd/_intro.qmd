@@ -1,0 +1,90 @@
+
+
+El dataset contiene 
+
+
+## Necesidad de regularizacion
+
+There are more variables than observations (d ≫ N).
+The optimum estimator is not unique.
+Numerical instabilities (e.g. if X⊺X is close to singular): small changes in the data lead to large changes in the model.
+Over-fitting avoidance: obtain more robust models that generalize well.
+Parsimony and interpretability: simpler models than can help to understand the relation between inputs and outputs.
+
+
+## pca
+Principal Component Analysis (Feature Extraction)
+
+el número de predictores puede ser mayor que el número de observaciones y los mínimos cuadrados ordinarios en su forma habitual serán incapaces de encontrar un conjunto único de coeficientes de regresión que minimicen el RSS Un par de soluciones comunes al problema de regresión en estas condiciones incluyen el preprocesamiento de los predictores mediante (1) la eliminación de los predictores altamente correlacionados utilizando técnicas como las descritas en la Secc. 3.3 o (2) realizar un PCA en los predictores como se describe en la Secc. 3.3. La eliminación de los predictores altamente correlacionados garantiza que las correlaciones por pares entre los predictores estén por debajo de un umbral preestablecido. Sin embargo, este proceso no garantiza necesariamente que las combinaciones lineales de predictores no estén correlacionadas con otros predictores. Si es así, la solución de mínimos cuadrados ordinarios seguirá siendo inestable. Por lo tanto, es importante comprender que la eliminación de predictores emparejados altamente correlacionados puede no garantizar una solución de mínimos cuadrados estable. Alternativamente, el uso de PCA para el preprocesamiento garantiza que los predictores resultantes, o sus combinaciones, no estarán correlacionados. La contrapartida de utilizar el PCA es que los nuevos predictores son combinaciones lineales de los predictores originales y, por lo tanto, la comprensión práctica de los nuevos predictores puede volverse turbia.
+
+Pre-processing predictors via PCA prior to performing regression is known as principal component regression (PCR) (Massy 1965); this technique has been widely applied in the context of problems with inherently highly correlated predictors or problems with more predictors than observations.
+
+
+## leaps
+
+
+Fature Selection. Stepwise selection
+
+Stepwise selection was originally developed as a feature selection technique for linear regression models. The forward stepwise regression approach uses a sequence of steps to allow features to enter or leave the regression model one-at-a-time. Often this procedure converges to a subset of features. The entry and exit criteria are commonly based on a p-value threshold. A typical entry criterion is that a p-value must be less than 0.15 for a feature to enter the model and must be greater than 0.15 for a feature to leave the model. The amount of variation explained can be condensed into a p-value for convenience.
+
+Both Box-Cox and Yeo-Johnson transform non-normal distribution into a normal distribution. However, Box-Cox requires all samples to be positive, while Yeo-Johnson has no restrictions
+
+## referencias
+https://topepo.github.io/caret/
+
+https://bookdown.org/egarpor/PM-UC3M/
+
+bagging
+https://bradleyboehmke.github.io/HOML/
+
+https://github.com/topepo/APM_Figures
+
+Smooth spectra:
+https://guifh.github.io/RNIR 
+
+https://glmnet.stanford.edu/index.html
+https://glmnet.stanford.edu/articles/glmnet.html
+
+Elastic Net
+
+https://bookdown.org/egarpor/PM-UC3M/glm-shrink.html
+
+https://bradleyboehmke.github.io/HOML/knn.html
+
+## Exploratory visualizations
+
+
+## 10.2 | Classes of Feature Selection Methodologies 
+
+Feature selection methodologies fall into three general classes: intrinsic (or implicit) methods, filter methods, and wrapper methods. Intrinsic methods have feature selection naturally incorporated with the modeling process, whereas filter and wrapper methods work to marry feature selection approaches with modeling techniques. The most seamless and important of the three classes for reducing features are intrinsic methods. Some examples include: 
+
+-   Tree- and rule-based models. These models search for the best predictor and split point such that the outcomes are more homogeneous within each new partition (recall Section 5.7). Therefore, if a predictor is not used in any split, it is functionally independent of the prediction equation and has been excluded from the model. Ensembles of trees have the same property, although some algorithms, such as random forest, deliberately force splits on irrelevant predictors when constructing the tree. This results in the over-selection of predictors (as shown below).
+
+-   Multivariate adaptive regression spline (MARS) models. These models create new features of the data that involve one or two predictors at a time (Section 6.2.1). The predictors are then added to a linear model in sequence. Like trees, if a predictor is not involved in at least one MARS feature, it is excluded from the model. 
+
+-   Regularization models. The regularization approach penalizes or shrinks predictor coefficients to improve the model fit. The lasso (Section 7.3) uses a type of penalty that shrinks coefficients to absolute zero. This forces predictors to be excluded from the final model.
+
+
+## Note
+In the context of predictive modeling, false positive findings can be minimized by using an independent set of data to evaluate the selected features. This context is exactly parallel to the context of identifying optimal model tuning parameters.
+
+## 11.2 | Simple Filters 
+
+The most basic approach to feature selection is to screen the predictors to see if any have a relationship with the outcome prior to including them in a model. To do this, a numeric scoring technique is required to quantify the strength of the relationship. Using the scores, the predictors are ranked and filtered with either a threshold or by taking the top p predictors. Scoring the predictors can be done separately for each predictor, or can be done simultaneously across all predictors (depending on the technique that is used). If the predictors are screened separately, there is a large variety of scoring methods. A summary of some popular and effective scoring techniques is provided below and is organized based on the type of predictor and outcome. 
+
+When the predictor is numeric, a simple pairwise correlation (or rank correlation) statistic can be calculated. If the relationship is nonlinear, then the maximal information coefficient (MIC) values (Reshef et al., 2011) or A statistics (Murrell et al., 2016), which measure strength of the association between numeric outcomes and predictors, can be used
+
+
+## Tables
+
+
+In the context of predictive modelling, false positive findings can be minimized by using an independent set of data to evaluate the selected features. This context is exactly parallel to the context of identifying optimal model tuning parameters.
+
+
+<!-- Y <- DT.test$Na2O #True Values -->
+<!-- Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values -->
+<!-- ERR <- (Y-Yp) #Residuals -->
+<!-- SE <- ERR^2 -->
+<!-- MSE <- mean(SE) -->
+<!-- RMSE <- sqrt(MSE) -->
+<!-- print(RMSE) -->

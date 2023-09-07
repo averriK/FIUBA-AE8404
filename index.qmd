@@ -1,0 +1,368 @@
+# Introducción
+
+```{r echo=FALSE,include=FALSE,message=FALSE,warning=FALSE}
+# rm(list=ls())
+source("R/setup.R")
+source("R/buildDataset.R")
+DATASET <- buildDataset()
+DT <- DATASET$DT
+Yo <- DATASET$Yo
+Xo <- DATASET$Xo
+SX <- DATASET$SX
+P <- 0.80
+MODEL <- readRDS(file=paste0("data/Model-P=",round(100*P,digits=0),".Rds"))
+RESULTS <- readRDS(file="data/Results.Rds")
+```
+
+## Planteo del problema
+
+Los siguientes datos corresponden a un trabajo para determinar la composición de un conjunto de vasijas de vidrio de un yacimiento arqueológico. Como el análisis espectrométrico es más económico que un análisis químico, se procuró calibrar el primero para que reemplace al segundo. Con este objetivo se tomaron muestras de `r nrow(Xo)` vasijas, a las que se realizaron espectrometrias de rayos X sobre 1920 frecuencias, y análisis de laboratorio para determinar el contenido de `r ncol(Yo)` compuestos químicos. Los datos de la espectrometria se reportaron en el archivo `Vessel_X.txt` para un rango de frecuencias significativas comprendido entre 100 y 400 Hz. Los contenidos de los `r ncol(Yo)` compuestos químicos de las vasijas se reportaron en el archivo `Vessel_Y.txt`. El compuesto químico de interés en el estudio es el Óxido de Sodio `Na2O`y se reporta en la primer columna del archivo. El objetivo del presente trabajo es comparar los diferentes métodos de predicción vistos en el curso de 2023 y encontrar el modelo óptimo para predecir la composición de `Na2O` a partir de una muestra dada por su espectro en frecuencias.
+
+## Análisis de los datos
+
+El dataset contiene `r nrow(Xo)` filas que representan el número de observaciones (Vasijas) y `r ncol(Xo)` columnas que representa el número de instancias o parámetros de cada observación, representadas en este caso por un espectro continuo de frecuencias. El análisis de los datos de entrada resulta en un dataset con `r ncol(Xo)` parámetros y `r nrow(Xo)` observaciones $(p>>N)$. El tipo de datos particular (espectrometría) determina que todos los parámetros de cada observación están correlacionados a través de un espectro continuo de frecuencias. La figura que sigue muestra un gráfico de correlaciones entre los parámetros del modelo
+
+```{r eval=FALSE, include=TRUE}
+
+```
+
+
+# Metodología
+
+
+## Regresión paramétrica
+
+El primer paso para la selección de modelos óptimos es entender cómo se relaciona cada parámetro del modelo $X_k$ con la variable (escalar) de respuesta $Y=f(X)=Na_2O$. Si $Y$ es una variable aleatoria escalar y $\textbf X=(X_1,..X_k,...X_p)^T$ es un vector de variables aleatorias, la respuesta $Y$ puede estimarse mediante la media condicional $E[Y|\textbf X]=E[Y]$[^index-1] y un error aleatorio $\varepsilon$ en la forma $Y=E[Y|\textbf X] +{\varepsilon}$, donde ${\varepsilon}$ es una variable aleatoria $\varepsilon$ con esperanza nula $E[ \varepsilon]=0$ y varianza constante $var[\varepsilon]\approx\sigma^2$ (homocedasticidad)[^index-2]. 
+
+El objetivo principal del análisis predictivo es encontrar una *función de regresión* (escalar) $\phi(\textbf x)$ que permita estimar la media condicional $E[Y|\textbf X=\textbf x]$ para cualquier realización de $\textbf{X}$ según un *modelo de regresión* $Y\approx E[Y|\textbf X ]$
+
+[^index-1]: Si aceptamos que $Y$ y $\textbf X$ son variables aleatorias independientes $E[Y|\textbf X ]=E[Y]$.
+
+[^index-2]: Si se asume que la variable aleatoria $\varepsilon$ sigue una distribución *normal*, $\varepsilon \sim \mathcal{N}(0,\sigma^2)$, entonces la media condicional $Y|\textbf x$ también seguirá distribución de probabilidad normal $Y|\textbf x \sim \mathcal{N}(\phi(\textbf x),\sigma^2 \textbf I)$.
+
+$$Y = \phi(\textbf{x}) +{\varepsilon}$$ {#eq-E1}
+
+La forma más simple que puede asumirse para la función de regresión $\phi(\textbf x)$ es una combinación lineal entre un número finito $p+1$ de parámetros y las $p$ variables independientes $\textbf{x}$. A esta familia de modelos paramétricos se los conoce como *modelos (multivariados) de regresión lineal* [-@eq-E2] donde el vector $\boldsymbol{\beta}=(\beta_0,...,\beta_{p})^T$ agrupa los $p+1$ (en este caso `r ncol(Xo)`) parámetros del modelo y el vector fila $\textbf{X}^i=[1 \ \ \textbf{x}^i]$[^index-4] representa una observación arbitraria del dataset. 
+
+En el contexto de aprendizaje estadístico, se requiere seleccionar diferentes algoritmos de entrenamiento que permitan estimar los parámetros [^index-3] a partir de un set de datos $\mathcal{D}=\{\textbf{x}^i,y^i \}$ de entrenamiento con $i=1...n$ donde $\textbf{x}^i=(x_1^i,x_2^i,,...x_p^i,)^T$ e $y^i$ son observaciones de las variables aleatorias $\textbf{X}$ e $Y$ respectivamente.
+
+$$\phi(\textbf{ x}^i)= \beta_0+\sum_{k=1}^{p} \beta_k \ x_k^i=  \textbf{X}^{i} · \boldsymbol{\beta}$$ {#eq-E2}
+
+La selección del modelo óptimo se basa en general en hacer mínimo el error de predicción del modelo. Existen varias métricas del error del modelo. La elección de la mediana condicional $E[Y|X]$ como un estimador de la respuesta, determina un error aleatorio $\varepsilon=Y-E[Y|X]$ desconocido, para el cual asumimos simplemente que serán variables aleatorias independientes[^index-3] con esperanza nula $E[\varepsilon^i]=0 \ \forall i$ y varianza constante $var[\varepsilon^i]=\sigma^2 \ \forall i$.
+
+[^index-3]: Si asumimos que las diferentes realizaciones de la respuesta $Y=y^i$ son variables aleatorias independientes, $\varepsilon^i$ serán también variables aleatorias independientes. Si asumimos además que siguen una distribución *normal* $\varepsilon^i \sim \mathcal{N}(0,\sigma^2)$, la independencia queda garantizada asegurando que los errores tengan correlación nula $cov[\varepsilon_i,\varepsilon_j]\approx 0$. La suma del cuadrado de los residuos (RSS por sus siglas en ingles) es una medida del error del ajuste y se define como $RSS = \|\textbf{r} \|^2= \textbf{r}^T·\textbf{r}$ donde $\textbf{r}=(r^1,...,r^n)^T$ es el vector de los *residuos* entre las observaciones de la respuesta $\textbf Y$ y el estimador de la esperanza condicional $\phi(\textbf{x})$
+
+$$RSS(\boldsymbol{\beta}) \approx (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})^T · (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})$${#eq-E3}
+
+Si entendemos al cuadrado los residuos $(r^i)^2$ como muestras de una variable aleatoria $R^2$, el *error cuadrático medio* (ECM, o MSE según sus siglas en inglés) se define como esperanza de esta variable segun $MSE=E[R^2]\approx 1/n \ RSS$. EL método de *cuadrados mínimos ordinarios (OLS)* permite obtener una estimación de los parámetros del modelo $\{\boldsymbol{\beta}\}$ que hacen mínimo al cuadrado de los residuos.  Derivando respecto del vector de parámetros e igualando a cero la expresión [-@eq-E3] se obtiene un estimador de los parámetros del modelo $\boldsymbol{\hat \beta}$ según OLS resulta 
+
+$$\hat {\boldsymbol{\beta}}_{lm}  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace RSS(\boldsymbol{\beta}) \rbrace = \left([X]^T·[X]\right)^{-1} ·[X]^T· \textbf{y}$${#eq-E4}
+
+donde $\hat {\boldsymbol{\beta}}$ es el estimador de los $p+1$ parámetros del modelo, $[X]$ es la *matriz de diseño* del modelo [^index-4] con $n$ filas y $p+1$ columnas que se construye a partir del conjunto de datos de entrenamiento $\{\textbf{x}^i,y^i \}$. La matriz $[X]^T·[X]$ es un arreglo de $(p+1)(p+1)$ que debe ser cumplir la condicion de no-singular para asegurar que la solución sea única.
+
+[^index-4]: $$[X] = \begin{bmatrix}
+    1& x_1^1& x_2^1& ...& x_p^1&\\
+    1& x_1^2& x_2^2& ...& x_p^2&\\
+    ...& ... \\
+    1& x_1^n& x_2^n& ...& x_p^n&\\
+    \end{bmatrix}$$
+
+
+
+
+```{r}
+XD <- cbind(1,Xo) |> as.matrix() |> unname()
+A <- t(XD)%*%XD 
+```
+
+En un escenario en donde se tienen casi tantos parámetros como observaciones, el problema tiende a estar sobredeterminado, los autovalores de la matriz $[X]^T·[X]$ serán muy pequeños y linealmente dependientes, y el determinante de la matriz $[X]^T·[X]$ será cercano a cero. Las estrategias para resolver este problema se analizan en los parágrafos subsiguientes
+
+
+## Selección de parámetros
+
+La estrategia más simple para resolver el problema consiste en reducir el número de parámetros del modelo mediante algún criterio de selección, y emplear el modelo de regresión sobre el set reducido. Dentro de esta estrategias se consideran las componentes principales [@sec-PCA], la eliminación recursiva de parámetros RFE [@sec-RFE] y un método ad-hoc diseñado en base a los espectros del problema [@sec-S3B]. 
+
+
+```{r eval=FALSE, include=TRUE}
+#  
+# Principal Component Analysiss  ----
+# 
+
+AUX <- buildDataset()
+DT <- AUX$DT
+Xo <- DT[,-c("Na2O")]
+Yo <- DT$Na2O
+
+MDL <- prcomp(Xo, scale.=TRUE,center=TRUE)
+SD <- MDL$sdev
+EigenValues <- SD^2
+VarExp <- EigenValues/sum(EigenValues)
+CumVarExp <- cumsum(VarExp)
+NCP <- length(CumVarExp[CumVarExp<=0.98] )
+XP <- MDL$x[,1:NCP] |> as.data.table()
+DTP <- cbind(XP,Na2O=Yo) |> as.data.table()
+
+Subset$pca <- list()
+Subset$pca$DTP <- DTP
+Subset$pca$NCP <- NCP
+Subset$pca$CumVarExp <- CumVarExp
+```
+
+Eliminación recursiva: La eliminación recursiva del algoritmo RFE se basa en árboles de decisión que particionan el conjunto de paràmetros buscan el mejor predictor y el mejor punto de división para que los resultados sean más homogéneos en cada nueva partición. Si un predictor no se utiliza en ninguna partición, es funcionalmente independiente de la ecuación de predicción y se excluye del modelo.
+
+```{r eval=FALSE, include=TRUE}
+#  
+# Backwards Feature Selection (recursive Feature Elimination)  ----
+# 
+DT.train <- DT[idx,]
+DT.test  <- DT[-idx,]
+CV.SET <- rfe(Na2O ~ ., 
+              data = DT.train, 
+              sizes=c(10:50),
+              metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+              rfeControl =  rfeControl(
+                functions=rfFuncs, 
+                method="repeatedcv", 
+                number=10,
+                repeats=5,
+                allowParallel = TRUE))
+
+# Variables seleccionadas
+VARS.RFE <- predictors(CV.SET)
+# "codo" con valor minimo (36)
+plot(CV.SET$results$Variables,CV.SET$results$RMSE)
+
+Subset$rfe <- list()
+Subset$rfe$vars <- predictors(CV.SET)
+Subset$rfe$nvars <- CV.SET$bestSubset
+```
+
+
+
+
+Componentes espectrales: Esta metodología es una aproximación numérica simple propuesta por el autor, que se basa en la naturaleza espectral de los datos, y tiene como objetivo identificar los "modos" principales mediante un metodo numerico sencillo basado en splines. Se puede demostrar que el número de "modos principales" que se obtienen mediante esta metodología es igual al número de componentes principales
+
+```{r eval=FALSE, include=TRUE}
+#  
+# Filtros basados en splines (S3B)  ----
+# 
+# Approach B: Un subset por el promedio de todos los samples
+
+SX.train <- SX[n %in% idx,]
+SX.test  <- SX[!(n %in% idx),]
+SY.train <- SY[idx,]
+SY.test  <- SY[-idx,]
+VARS <- NULL
+LMX <- NULL
+
+Freq <- SX.train$f |> unique()
+NFOLDS <- 10 # Numero de Folds: 9 A 54
+REPEAT <- 100
+k <- 1
+while(k<REPEAT){
+  SAMPLE <- SX.train[n %in% sample(x=n,size=round(P*180/NFOLDS)),.(f,S)] 
+  MDL  <- smooth.spline(x=SAMPLE$f,y=SAMPLE$S)
+  AUX <- predict(MDL)
+  DATA <- data.table(f=AUX$x,S=AUX$y)
+  i <-  which(diff(sign(diff(DATA$S)))==-2)+1
+  LMX <- c(LMX,i) |> unique()
+  
+  k <- k+1
+}
+# Agregar primer frecuencia (es un maximo)
+LMX <- c(1,LMX) |> sort(decreasing = FALSE)
+# remover frecuencias contiguas
+I <- !(abs(diff(LMX)) <=5)
+LMX <- LMX[I]
+VARS <- paste0("F", Freq[LMX])
+
+# Plot
+SAMPLE <- SX.test[,.(f,S)] # SX.train[,.(f,S)]
+MDL  <- smooth.spline(x=SAMPLE$f,y=SAMPLE$S)
+AUX <- predict(MDL)
+DATA <- data.table(f=AUX$x,S=AUX$y)
+DATA[,VAR:=paste0("F",f)]
+HC0 <- buildHCPlot(
+  LEGEND=TRUE,
+  COLORS=hcl.colors(n=15,palette="Hawaii"),
+  LAYOUT="vertical",
+  XLOG = FALSE,YLOG = TRUE,XREV=FALSE,YREV=FALSE,
+  XT="fn",YT="Sn ",
+  CURVE=DATA[,.(ID="spline (Train)",X=f,Y=S)],
+  COLUMN=DATA[LMX,.(ID=VAR,X=f,Y=S)]
+)
+# HC0
+
+Subset$s3b <- list()
+Subset$s3b$vars <- VARS
+Subset$s3b$nvars <- length(VARS)
+Subset$s3b$Plot.Spectra <- HC0
+```
+
+Las ordenadas de la figura siguiente muestra los valores de los parámetros `F100` a `F400` del dataset y las abscisas presentan la variable continua $f [Hz]$ equivalente al rango discreto $f=100,101 ... 400$
+
+```{r include=TRUE }
+#| label: fig-Spectra
+#| layout-ncol: 1
+#| fig-cap: "Ordenadas espectrales de cada parámetro del modelo para el set de testeo ()."
+DT <- DATASET$DT
+DATA <- SX[n %in% sample(1:nrow(DT),size=7)]
+
+HC0 <- buildHCPlot(
+  LEGEND=TRUE,
+  COLORS=hcl.colors(n=8,palette="Plasma"),
+  LAYOUT="vertical",
+  XLOG = FALSE,YLOG = TRUE,XREV=FALSE,YREV=FALSE,
+  XT="fn",YT="Sn ",
+  CURVE=DATA[,.(ID=n,X=f,Y=S)]
+)
+HC0
+```
+
+
+
+
+
+## Regularización de parámetros {#sec-SEL}
+
+
+
+Una estrategia para resolver este problema consiste en regularizar la matriz $[X]^T·[X]$ imponiendo una restricción de tamaño a los coeficientes.  La regresión de Ridge [-@HastieEA2009] reduce los coeficientes de regresión $\boldsymbol{\beta}$ imponiendo una penalización a su tamaño. Los coeficientes Ridge minimizan una suma de cuadrados residual penalizada. Si se centran las variables, $x_k^i=x_k^i-\bar x^i$, y se estima por separado el sesgo del modelo  $\beta_0\approx \bar y=1/N·\sum_{1}^{N} {y^i}$, la matriz de diseño $[X]$ se reduce a una matriz de $p$ columnas y el vector de coeficientes Error cuadrático medio penalizado resulta igual a [-@eq-E5]
+
+$$RSS(\boldsymbol{\beta},\lambda) = (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})^T · (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})+\lambda \boldsymbol{\beta}^T \boldsymbol{\beta}$${#eq-E5}
+
+A partir de esta expresión los coeficientes restantes $\boldsymbol{\beta}$ de la regresión de Ridge se pueden obtener directamente según [-@eq-E6] , donde $\lambda$ es un hiperparámetro de penalización a calibrar mediante validación cruzada. 
+
+$$\hat {\boldsymbol{\beta}}_{ridge}(\lambda)  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace \sum_{i=1}^{N}(y^i-\beta_0-\sum_{j=1}^{p} x_j^i \beta_j)^2+\lambda\sum_{j=1}^{p}(\beta_j)^2 \rbrace = \left([X]^T·[X] +\lambda \textbf{I} \right)^{-1} ·[X]^T· \textbf{y}$${#eq-E6}
+
+ También es posible regularizar mediante una penalización LASSO (Least Absolute Shrinkage and Selection Operator), que en lugar de emplear una norma $L_2$ (valor cuadrático) utiliza una norma $L_1$ (valor absoluto) para los coeficientes. 
+
+$$\hat {\boldsymbol{\beta}}_{lasso}(\lambda)  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace \sum_{i=1}^{N}(y^i-\beta_0-\sum_{j=1}^{p} x_j^i \beta_j)^2+\lambda\sum_{j=1}^{p} |{\beta_j}| \rbrace $${#eq-E7}
+
+
+En sección [-@sec-LASSO] y [-@sec-RIDGE] se obtiene el valor óptimo del coeficiente $\lambda$ mediante validación cruzada del modelo de regresión de LASSO mediante las librerías `elasticnet::enet()` y `caret::train()`. 
+
+Finalmente, la penalidad del Elastic-Net propone una combinación lineal entre ambos factores, y es un compromiso entre las bondades de la penalización Ridge y el LASSO [-@eq-E8]. El modelo Elastic-Net elimina variables como el LASSO, y contrae (penaliza) juntos los coeficientes de predictores correlacionados como el Ridge [-@HastieEA2009]. 
+
+$$\hat {\boldsymbol{\beta}}_{enet}(\lambda)  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace \sum_{i=1}^{N}(y^i-\beta_0-\sum_{j=1}^{p} x_j^i \beta_j)^2+\lambda(\sum_{j=1}^{p}\alpha+ (1-\alpha) |{\beta_j}|) \rbrace $${#eq-E8}
+
+Excepto en el caso de Ridge, en donde es posible obtener directamente los coeficientes mediante la resolución de un sistema lineal de ecuaciones [-@eq-E6], en la regularización LASSO y Elastic-Net las ecuaciones del mínimo local [-@eq-E7] y [-@eq-E8] no son lineales y deben resolverse mediante métodos numéricos.  En sección [-@sec-ENET] se obtiene el valor óptimo de los coeficientes $\lambda$ y $\alpha$ mediante validación cruzada del modelo de regresión de Elastic-Net mediante mediante las librerías `elasticnet::enet()`, `glmnet::glmnet()`  y `caret::train()`. 
+
+
+<!-- ## Regresión no-paramétrica  -->
+
+<!-- La tercer estrategia consiste en emplear métodos de regresión no-lineales que emplean internamente etapas de selección de variables, pero no requieren una formulación paramétrica explícita, aunque sea posible identificar el grado de explicación de la varianza de los parámetros del dataset. En un modelo no-paramétrico, no se establecen restricciones acerca de la función de distribución de la media condicional $E[Y/X]$ -->
+
+<!-- Regresión basada en kernels (knn) -->
+
+
+<!-- Regresión basada en árboles de decisión (RandomForest) -->
+
+
+# Entrenamiento de modelos
+## Datasets
+## Hiperparámetros y C.V.
+## Modelos de regresión
+
+### Regresión lineal con eliminación recursiva de parámetros {#sec-RFE}
+
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión lineal con el subset reducido mediante RFE, donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tal como está implementado (basado en un subset reducido) no tiene hiperparámetros. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$rfe_lm$MSE.train |> round(digits=3)` y `r MODEL$rfe_lm$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$rfe_lm$R2.train |> round(digits=3)` y `r MODEL$rfe_lm$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+
+{{< include qmd/rfe_lmPlots.qmd >}}
+
+### Regresión lineal con componentes principales {#sec-PCA}
+
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión lineal empleando un subset reducido de componentes principales donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tal como está implementado (basado en un subset reducido) no tiene hiperparámetros. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$pca_lm$MSE.train |> round(digits=3)` y `r MODEL$pca_lm$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$pca_lm$R2.train |> round(digits=3)` y `r MODEL$pca_lm$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+{{< include qmd/pca_lmPlots.qmd >}}
+
+Complementariamente, se analizó un modelo de regresión por componentes principales empleando el paquete `pcr`, que efectúa internamente la selección de variables y se compararon resultados con el modelo lineal. EL modelo tiene como único hiperparámetro el número de componentes. El modelo tiene como hiperparámetro el número de componentes `ncomp`. La validación cruzada estimó el hiperparámero `ncomp=` `r MODEL$pcr$CV.MDL$finalModel$tuneValue$ncomp`.  El modelo de regresión PCR reportó un error cuadrático medio $MSE\approx$ `r MODEL$pcr$MSE.train |> round(digits=3)` y `r MODEL$pcr$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$pcr$R2.train |> round(digits=3)` y `r MODEL$pcr$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+
+{{< include qmd/pcrPlots.qmd >}}
+
+
+
+### Regresión lineal mediante componentes espectrales {#sec-S3B}
+
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión lineal con el subset S3B, donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tal como está implementado (basado en un subset optimizado) no tiene hiperparámetros. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$s3b_lm$MSE.train |> round(digits=3)` y `r MODEL$s3b_lm$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$s3b_lm$R2.train |> round(digits=3)` y `r MODEL$s3b_lm$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+
+{{< include qmd/s3b_lmPlots.qmd >}}
+
+
+### Regresión mediante regularización Ridge (L2) {#sec-RIDGE}
+
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión RIDGE donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene un único hiperparámetro $\lambda$. La validación cruzada estimó el hiperparámero $\lambda\approx$ `r MODEL$ridge$CV.MDL$finalModel$tuneValue$lambda |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$ridge$MSE.train |> round(digits=3)` y `r MODEL$ridge$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$ridge$R2.train |> round(digits=3)` y `r MODEL$ridge$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+{{< include qmd/ridgePlots.qmd >}}
+
+### Regresión mediante regularización LASSO (L1){#sec-LASSO}
+
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión LASSO donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene un único hiperparámetro $\lambda$. La validación cruzada estimó un $\lambda\approx$ `r MODEL$lasso$CV.MDL$finalModel$tuneValue$fraction |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$lasso$MSE.train |> round(digits=3)` y `r MODEL$lasso$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$lasso$R2.train |> round(digits=3)` y `r MODEL$lasso$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+{{< include qmd/lassoPlots.qmd >}}
+
+
+
+
+### Regresión mediante regularización mixta (Elastic-Net) {#sec-ENET}
+
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión E-NET mediante el paquete `enet`, donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene como hiperparámetros $\alpha$  y $\lambda$. La validación cruzada estimó los hiperparámeros $\lambda\approx$ `r MODEL$enet$CV.MDL$finalModel$tuneValue$lambda |> round(digits=3)` y $\alpha\approx$ `r MODEL$enet$CV.MDL$finalModel$tuneValue$fraction |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$enet$MSE.train |> round(digits=3)` y `r MODEL$enet$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$enet$R2.train |> round(digits=3)` y `r MODEL$enet$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+
+{{< include qmd/enetPlots.qmd >}}
+
+A modo de comparación y análisis de sensibilidad, se analizó un modelo E-NET mediante el paquete `glmnet`
+La validación cruzada estimó los hiperparámeros $\lambda\approx$ `r MODEL$glmnet$CV.MDL$finalModel$tuneValue$lambda |> round(digits=3)` y $\alpha\approx$ `r MODEL$glmnet$CV.MDL$finalModel$tuneValue$alpha |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$glmnet$MSE.train |> round(digits=3)` y `r MODEL$glmnet$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$glmnet$R2.train |> round(digits=3)` y `r MODEL$glmnet$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+{{< include qmd/glmnetPlots.qmd >}}
+
+
+### Regresión basada en kernels (knn) {#sec-KNN}
+
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión K-NN donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo.El modelo tiene como único hiperparámetro el número de núcleos $k_{max}$. La validación cruzada estimó l$k_{max}\approx$ `r MODEL$knn$CV.MDL$finalModel$tuneValue$kmax |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$knn$MSE.train |> round(digits=3)` y `r MODEL$knn$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$knn$R2.train |> round(digits=3)` y `r MODEL$knn$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+{{< include qmd/knnPlots.qmd >}}
+
+<!-- ## Núcleos(knn) - Subset PCA -->
+
+<!-- {{< include qmd/pca_knnPlots.qmd >}} -->
+
+<!-- ## Núcleos(knn) - Subset RFE -->
+
+<!-- {{< include qmd/rfe_knnPlots.qmd >}} -->
+
+<!-- ## Núcleos(knn) - Subset S3B -->
+
+<!-- {{< include qmd/s3b_knnPlots.qmd >}} -->
+
+
+### Regresión basada en árboles de decisión (RandomForest) {#sec-RF}
+
+
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión RF donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene como único hiperparámetro el número de ramas `mtry`. La validación cruzada estimó  `mtry=` `r MODEL$rf$CV.MDL$finalModel$tuneValue$mtry |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$rf$MSE.train |> round(digits=3)` y `r MODEL$rf$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$rf$R2.train |> round(digits=3)` y `r MODEL$rf$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+{{< include qmd/rfPlots.qmd >}}
+
+
+<!-- {{< include qmd/pca_rfPlots.qmd >}} -->
+
+
+<!-- {{< include qmd/rfe_rfPlots.qmd >}} -->
+
+
+<!-- {{< include qmd/s3b_rfPlots.qmd >}} -->
+
+
+# Conclusiones
+
+## Resumen de Resultados
+
+{{< include qmd/summaryPlots.qmd >}}
+
+## Discusión de Resultados
+
+
+

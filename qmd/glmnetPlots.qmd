@@ -1,0 +1,56 @@
+
+::: {.panel-tabset}
+
+
+### Residuos
+
+
+
+```{r include=TRUE }
+#| label: fig-glmnet_1
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Residuos del modelo"
+MODEL$glmnet$Plot.Residuals
+```
+
+### Predictores
+
+```{r include=TRUE }
+#| label: fig-glmnet_2
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Predicción del modelo"
+MODEL$glmnet$Plot.Predictors
+```
+
+
+### Distribución
+
+
+```{r include=TRUE }
+#| label: fig-glmnet_3
+#| layout-ncol: 1
+#| fig-cap: "Densidad estimada de los residuos" 
+
+MODEL$glmnet$Plot.Density
+```
+
+### Importancia
+
+```{r include=TRUE }
+#| label: fig-glmnet_4
+#| layout-ncol: 1
+#| fig-cap: "Factor de Importancia (VI) de cada parámetro del modelo *glmnet*" 
+
+MODEL$glmnet$Plot.VarImp
+```
+
+### Hiperparámetros (CV)
+
+
+```{r include=TRUE, echo=FALSE}
+print(MODEL$glmnet$CV.MDL)
+```
+
+:::

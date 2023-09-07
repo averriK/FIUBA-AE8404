@@ -1,0 +1,56 @@
+
+::: {.panel-tabset}
+
+
+### Residuos
+
+
+
+```{r include=TRUE }
+#| label: fig-rf_1
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Residuos del modelo"
+MODEL$rf$Plot.Residuals
+```
+
+### Predictores
+
+```{r include=TRUE }
+#| label: fig-rf_2
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Predicción del modelo"
+MODEL$rf$Plot.Predictors
+```
+
+
+### Distribución
+
+
+```{r include=TRUE }
+#| label: fig-rf_3
+#| layout-ncol: 1
+#| fig-cap: "Densidad estimada de los residuos" 
+
+MODEL$rf$Plot.Density
+```
+
+### Importancia
+
+```{r include=TRUE }
+#| label: fig-rf_4
+#| layout-ncol: 1
+#| fig-cap: "Factor de Importancia (VI) de cada parámetro del modelo *rf*" 
+
+MODEL$rf$Plot.VarImp
+```
+
+### Hiperparámetros (CV)
+
+
+```{r include=TRUE, echo=FALSE}
+print(MODEL$rf$CV.MDL)
+```
+
+:::

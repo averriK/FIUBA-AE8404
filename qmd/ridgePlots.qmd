@@ -1,0 +1,54 @@
+
+::: {.panel-tabset}
+
+
+### Residuos
+
+```{r include=TRUE }
+#| label: fig-ridge_1
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Residuos del modelo"
+MODEL$ridge$Plot.Residuals
+```
+
+### Predictores
+
+```{r include=TRUE }
+#| label: fig-ridge_2
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Predicción del modelo"
+MODEL$ridge$Plot.Predictors
+```
+
+
+### Distribución
+
+
+```{r include=TRUE }
+#| label: fig-ridge_3
+#| layout-ncol: 1
+#| fig-cap: "Densidad estimada de los residuos" 
+
+MODEL$ridge$Plot.Density
+```
+
+### Importancia
+
+```{r include=TRUE }
+#| label: fig-ridge_4
+#| layout-ncol: 1
+#| fig-cap: "Factor de Importancia (VI) de cada parámetro del modelo *ridge*" 
+
+MODEL$ridge$Plot.VarImp
+```
+
+### Hiperparámetros (CV)
+
+
+```{r include=TRUE, echo=FALSE}
+print(MODEL$ridge$CV.MDL)
+```
+
+:::

@@ -1,0 +1,55 @@
+
+::: {.panel-tabset}
+
+
+### Residuos
+
+
+
+```{r include=TRUE }
+#| label: fig-lasso_1
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Residuos del modelo"
+MODEL$lasso$Plot.Residuals
+```
+
+### Predictores
+
+```{r include=TRUE }
+#| label: fig-lasso_2
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Predicción del modelo"
+MODEL$lasso$Plot.Predictors
+```
+
+### Distribución
+
+
+```{r include=TRUE }
+#| label: fig-lasso_3
+#| layout-ncol: 1
+#| fig-cap: "Densidad estimada de los residuos" 
+
+MODEL$lasso$Plot.Density
+```
+
+### Importancia
+
+```{r include=TRUE }
+#| label: fig-lasso_4
+#| layout-ncol: 1
+#| fig-cap: "Factor de Importancia (VI) de cada parámetro del modelo *lasso*" 
+
+MODEL$lasso$Plot.VarImp
+```
+
+### Hiperparámetros (CV)
+
+
+```{r include=TRUE, echo=FALSE}
+print(MODEL$lasso$CV.MDL)
+```
+
+:::

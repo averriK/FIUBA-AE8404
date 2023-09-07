@@ -1,0 +1,54 @@
+
+::: {.panel-tabset}
+
+
+### Residuos
+
+```{r include=TRUE }
+#| label: fig-pca_lm_1
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Residuos del modelo"
+MODEL$pca_lm$Plot.Residuals
+```
+
+### Predictores
+
+```{r include=TRUE }
+#| label: fig-pca_lm_2
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Predicción del modelo"
+MODEL$pca_lm$Plot.Predictors
+```
+
+
+### Distribución
+
+
+```{r include=TRUE }
+#| label: fig-pca_lm_3
+#| layout-ncol: 1
+#| fig-cap: "Densidad estimada de los residuos" 
+
+MODEL$pca_lm$Plot.Density
+```
+
+### Importancia
+
+```{r include=TRUE }
+#| label: fig-pca_lm_4
+#| layout-ncol: 1
+#| fig-cap: "Factor de Importancia (VI) de cada parámetro del modelo *pca_lm*" 
+
+MODEL$pca_lm$Plot.VarImp
+```
+
+### Hiperparámetros (CV)
+
+
+```{r include=TRUE, echo=FALSE}
+print(MODEL$pca_lm$CV.MDL)
+```
+
+:::

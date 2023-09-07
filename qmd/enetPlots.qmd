@@ -1,0 +1,63 @@
+
+::: {.panel-tabset}
+
+
+### Residuos
+
+
+
+```{r include=TRUE }
+#| label: fig-enet_1
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Residuos del modelo"
+MODEL$enet$Plot.Residuals
+```
+
+### Predictores
+
+```{r include=TRUE }
+#| label: fig-enet_2
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Predicción del modelo"
+MODEL$enet$Plot.Predictors
+```
+
+### Distribución
+
+
+```{r include=TRUE }
+#| label: fig-enet_3
+#| layout-ncol: 1
+#| fig-cap: "Densidad estimada de los residuos" 
+
+MODEL$enet$Plot.Density
+```
+
+
+### Importancia
+
+```{r include=TRUE }
+#| label: fig-enet_4
+#| layout-ncol: 1
+#| fig-cap: "Factor de Importancia (VI) de cada parámetro del modelo *enet*" 
+
+MODEL$enet$Plot.VarImp
+```
+
+<!-- ```{r include=TRUE, echo=FALSE} -->
+<!-- DATA <- MODEL$enet$VARIMP[,.(VI=round(VI,digits=3),ID)] -->
+<!-- setorderv(DATA,cols="VI",order = -1L) -->
+<!-- DATA %>% head(25) %>% flextable() -->
+<!-- ``` -->
+
+
+### Hiperparámetros (CV)
+
+
+```{r include=TRUE, echo=FALSE}
+print(MODEL$enet$CV.MDL)
+```
+
+:::

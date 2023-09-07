@@ -1,0 +1,62 @@
+El dataset original fue particionado en un dataset de entrenamiento y uno de prueba. La proporción entre datos de prueba y datos de entrenamiento constituye también un hiperparámetro. La figuras [-@fig-S1] y [-@fig-S2] muestran los rangos de variación del error estándar `RMSE` y el coeficiente de reresión `R2`que resultan de las diferentes particiones del dataset de prueba, que tiene entre 5% y 30% de las muestras del dataset original. 
+
+::: {.panel-tabset}
+
+
+### RMSE
+
+
+
+```{r include=TRUE }
+#| label: fig-S1
+#| layout-nrow: 1
+#| fig-cap: "Rango de variación del error estándar (RMSE) del dataset de entrenamiento considerando diferentes particiones del dataset original. Se consideraron particiones del 70%,75%,80%, 85%, 90% y 95%" 
+RESULTS$Plot.RMSE.test
+```
+
+### R2
+```{r include=TRUE }
+#| label: fig-S2
+#| layout-nrow: 1
+#| fig-cap: "Rango de variación del error estándar (RMSE) del dataset de testeo considerando diferentes particiones del dataset original. Se consideraron particiones del 70%,75%,80%, 85%, 90% y 95%" 
+RESULTS$Plot.R2.test
+```
+
+### Dataset
+
+:::
+
+
+
+
+
+
+Las figuras [-@fig-S6] y [-@fig-S7] presentan los valores medios y los cuantiles del 25% y 75% del error estándar `RMSE` y del coeficiente de regresión de Pearson (Box-Plots). Las propiedades estadísticas de estos indicadores se obtuvieron mediante la función `resample()` del paquete `caret` que utiliza los diferentes resampleos efectuados durante la validación cruzada.  
+
+
+::: {.panel-tabset}
+
+### RMSE
+
+```{r include=TRUE }
+#| label: fig-S6
+#| layout-ncol: 1
+#| fig-cap: "Rango de variación (Box-Plot) del error estándar  (RMSE), considerando diferentes realizaciones en validación cruzada." 
+
+RESULTS$BoxPlot.RMSE
+```
+
+
+### R2
+
+```{r include=TRUE }
+#| label: fig-S7
+#| layout-ncol: 1
+#| fig-cap: "Rango de variación (Box-Plot) del coeficiente de Pearson R2, considerando diferentes realizaciones en validación cruzada." 
+
+RESULTS$BoxPlot.R2
+```
+
+### Dataset
+
+:::

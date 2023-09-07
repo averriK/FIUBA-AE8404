@@ -1,0 +1,54 @@
+
+::: {.panel-tabset}
+
+
+### Residuos
+
+```{r include=TRUE }
+#| label: fig-pcr_1
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Residuos del modelo"
+MODEL$pcr$Plot.Residuals
+```
+
+### Predictores
+
+```{r include=TRUE }
+#| label: fig-pcr_2
+#| column: body-outset-right
+#| layout-ncol: 1
+#| fig-cap: "Predicción del modelo"
+MODEL$pcr$Plot.Predictors
+```
+
+
+### Distribución
+
+
+```{r include=TRUE }
+#| label: fig-pcr_3
+#| layout-ncol: 1
+#| fig-cap: "Densidad estimada de los residuos" 
+
+MODEL$pcr$Plot.Density
+```
+
+### Importancia
+
+```{r include=TRUE }
+#| label: fig-pcr_4
+#| layout-ncol: 1
+#| fig-cap: "Factor de Importancia (VI) de cada parámetro del modelo *pcr*" 
+
+MODEL$pcr$Plot.VarImp
+```
+
+### Hiperparámetros (CV)
+
+
+```{r include=TRUE, echo=FALSE}
+print(MODEL$pcr$CV.MDL)
+```
+
+:::
