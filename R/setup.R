@@ -1,7 +1,8 @@
 
 library(data.table) |> suppressPackageStartupMessages()
 library(flextable) # Plot Tables
-library(webshot)
+library(webshot2)
+library(htmlwidgets)
 library(highcharter)  |> suppressPackageStartupMessages()
 library(glmnet) |> suppressPackageStartupMessages()
 library(hrbrthemes) |> suppressPackageStartupMessages()

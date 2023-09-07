@@ -1,4 +1,4 @@
-
+# *********************************************************-----
 # rm(list=ls())
 # source("R/setup.R")
 SUM_DT <- NULL
@@ -143,7 +143,7 @@ SUM_DT |> flextable() |>
   bold(part = "header")
 
 fwrite(SUM_DT,"deliv/resumen.csv")
-
+# *********************************************************-----
 DATA <- SUM_DT[,.(low=min(RMSE.test)|> round(digits=3),high=max(RMSE.test) |> round(digits=3)),by=.(ID)][order(low,decreasing = TRUE)]
 HC1 <- highcharter::highchart()|> 
   hc_add_series(
@@ -186,7 +186,7 @@ HC1 <- highcharter::highchart()|>
 
 HC1
 
-
+# *********************************************************-----
 DATA <- SUM_DT[,.(low=min(R2.test)|> round(digits=3),high=max(R2.test) |> round(digits=3)),by=.(ID)][order(low,decreasing = TRUE)]
 HC3 <- highcharter::highchart()|> 
   hc_add_series(
@@ -363,6 +363,7 @@ HC2 <- highcharter::highchart()|>
     pointFormat = "RMSE max={point.high}<br> RMSE min={point.low}")
 
 HC2
+# *********************************************************-----
 DATA <- SUM_DT[,.(low=min(R2.train)|> round(digits=3),high=max(R2.train) |> round(digits=3)),by=.(ID)][order(low,decreasing = TRUE)]
 HC4 <- highcharter::highchart()|> 
   hc_add_series(
@@ -404,9 +405,37 @@ HC4 <- highcharter::highchart()|>
     pointFormat = "R2 max={point.high}<br> R2 min={point.low}")
 
 HC4
-# *********************************************************-----
 
 # *********************************************************-----
+DATASET <- buildDataset()
+Xo <- DATASET$Xo
+DATA <- cor(log(Xo))
+HC10 <- hchart(DATA) %>% 
+  hc_legend(layout = "vertical",
+            align = "right",
+            verticalAlign = "top") %>% 
+  hc_colors(colors = hcl.colors(n=5, palette = "RdBu" ))|>
+  hc_legend(
+    align = "left",
+    verticalAlign = "top",
+    layout = "vertical",
+    x = 100,    y = 100
+  )  |>
+  
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  
+  # hc_size( height = 600) |>    
+  hc_chart(
+    style=list(fontFamily = "Helvetica"))
+
+saveWidget(widget = HC10, file = "html/aux.html",selfcontained = TRUE)
+webshot::webshot(url = "html/aux.html", file = "data/corr.png",delay = 4)
+
+# *********************************************************-----
+
+
+
+
 
 Results <- list()
 Results$BoxPlot.RMSE <- HC8
@@ -415,6 +444,7 @@ Results$Plot.RMSE.test <- HC1
 Results$Plot.R2.test <- HC3
 Results$Plot.RMSE.train <- HC2
 Results$Plot.R2.train <- HC4
+Results$Plot.Correlation <- HC10
 Results$Summary <- SUM_DT
 Results$Resamples <- RES
 FILE <- "data/Results.Rds"

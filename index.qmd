@@ -20,19 +20,47 @@ Los siguientes datos corresponden a un trabajo para determinar la composición d
 
 ## Análisis de los datos
 
-El dataset contiene `r nrow(Xo)` filas que representan el número de observaciones (Vasijas) y `r ncol(Xo)` columnas que representa el número de instancias o parámetros de cada observación, representadas en este caso por un espectro continuo de frecuencias. El análisis de los datos de entrada resulta en un dataset con `r ncol(Xo)` parámetros y `r nrow(Xo)` observaciones $(p>>N)$. El tipo de datos particular (espectrometría) determina que todos los parámetros de cada observación están correlacionados a través de un espectro continuo de frecuencias. La figura que sigue muestra un gráfico de correlaciones entre los parámetros del modelo
+El dataset contiene `r nrow(Xo)` filas que representan el número de observaciones (Vasijas) y `r ncol(Xo)` columnas que representa el número de instancias o parámetros de cada observación, representadas en este caso por un espectro continuo de frecuencias. El análisis de los datos de entrada resulta en un dataset con `r ncol(Xo)` parámetros y `r nrow(Xo)` observaciones $(p>>N)$. El tipo de datos particular (espectrometría) determina que todos los parámetros de cada observación están correlacionados a través de un espectro continuo de frecuencias. 
 
-```{r eval=FALSE, include=TRUE}
 
+
+
+
+Todos los parámetros forman parte de un _espectro de respuesta_ y por lo tanto están correlacionados. Las ordenadas de la figura [-@fig-Spectra] muestra los valores de 10 parámetros arbitrarios del dataset, donnde las abscisas presentan la variable continua $f [Hz]$ equivalente al rango discreto $f=100,101 ... 400$. 
+
+
+```{r include=TRUE }
+#| label: fig-Spectra
+#| layout-ncol: 1
+#| fig-cap: "Ordenadas espectrales de cada parámetro del modelo."
+DT <- DATASET$DT
+DATA <- SX[n %in% sample(1:nrow(DT),size=10)]
+
+HC0 <- buildHCPlot(
+  LEGEND=TRUE,
+  COLORS=hcl.colors(n=20,palette="Plasma"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = TRUE,XREV=FALSE,YREV=FALSE,
+  XT="fn",YT="Sn ",
+  CURVE=DATA[,.(ID=n,X=f,Y=S)]
+)
+HC0
 ```
 
+La figura [-@fig-CP1] muestra un gráfico de la matriz de correlaciones entre los parámetros del modelo. Las zonas claras representan datos con poca o nula correlación. Se puede observar en el gráfico anterior que la gran mayoría de los datos están altamente correlacionados, con muy pocos datos de baja o nula correlación. 
+
+![Matriz de correlaciones de los parámetros.](data/corr.png){#fig-CP1}
+
+
+Las estrategias convencionales de eliminación de parámetros altamente correlacionados no pueden aplicarse en este tipo de problemas.
 
 # Metodología
 
+## Modelos de Regresión 
 
-## Regresión paramétrica
+El primer paso para la selección de modelos óptimos es entender cómo se relaciona cada parámetro del modelo $X_k$ con la variable (escalar) de respuesta $Y=f(X)=Na_2O$ a traves de un modelo de regresión. En esta sección se analizan los conceptos mínimos asociados a modelos paramétricos y no-paramétricos.
 
-El primer paso para la selección de modelos óptimos es entender cómo se relaciona cada parámetro del modelo $X_k$ con la variable (escalar) de respuesta $Y=f(X)=Na_2O$. Si $Y$ es una variable aleatoria escalar y $\textbf X=(X_1,..X_k,...X_p)^T$ es un vector de variables aleatorias, la respuesta $Y$ puede estimarse mediante la media condicional $E[Y|\textbf X]=E[Y]$[^index-1] y un error aleatorio $\varepsilon$ en la forma $Y=E[Y|\textbf X] +{\varepsilon}$, donde ${\varepsilon}$ es una variable aleatoria $\varepsilon$ con esperanza nula $E[ \varepsilon]=0$ y varianza constante $var[\varepsilon]\approx\sigma^2$ (homocedasticidad)[^index-2]. 
+Si $Y$ es una variable aleatoria escalar y $\textbf X=(X_1,..X_k,...X_p)^T$ es un vector de variables aleatorias, la respuesta $Y$ puede estimarse mediante la media condicional $E[Y|\textbf X]=E[Y]$[^index-1] y un error aleatorio $\varepsilon$ en la forma $Y=E[Y|\textbf X] +{\varepsilon}$, donde ${\varepsilon}$ es una variable aleatoria $\varepsilon$ con esperanza nula $E[ \varepsilon]=0$ y varianza constante $var[\varepsilon]\approx\sigma^2$ (homocedasticidad)[^index-2]. 
 
 El objetivo principal del análisis predictivo es encontrar una *función de regresión* (escalar) $\phi(\textbf x)$ que permita estimar la media condicional $E[Y|\textbf X=\textbf x]$ para cualquier realización de $\textbf{X}$ según un *modelo de regresión* $Y\approx E[Y|\textbf X ]$
 
@@ -41,6 +69,8 @@ El objetivo principal del análisis predictivo es encontrar una *función de reg
 [^index-2]: Si se asume que la variable aleatoria $\varepsilon$ sigue una distribución *normal*, $\varepsilon \sim \mathcal{N}(0,\sigma^2)$, entonces la media condicional $Y|\textbf x$ también seguirá distribución de probabilidad normal $Y|\textbf x \sim \mathcal{N}(\phi(\textbf x),\sigma^2 \textbf I)$.
 
 $$Y = \phi(\textbf{x}) +{\varepsilon}$$ {#eq-E1}
+
+## Regresión paramétrica
 
 La forma más simple que puede asumirse para la función de regresión $\phi(\textbf x)$ es una combinación lineal entre un número finito $p+1$ de parámetros y las $p$ variables independientes $\textbf{x}$. A esta familia de modelos paramétricos se los conoce como *modelos (multivariados) de regresión lineal* [-@eq-E2] donde el vector $\boldsymbol{\beta}=(\beta_0,...,\beta_{p})^T$ agrupa los $p+1$ (en este caso `r ncol(Xo)`) parámetros del modelo y el vector fila $\textbf{X}^i=[1 \ \ \textbf{x}^i]$[^index-4] representa una observación arbitraria del dataset. 
 
@@ -80,8 +110,13 @@ En un escenario en donde se tienen casi tantos parámetros como observaciones, e
 
 ## Selección de parámetros
 
-La estrategia más simple para resolver el problema consiste en reducir el número de parámetros del modelo mediante algún criterio de selección, y emplear el modelo de regresión sobre el set reducido. Dentro de esta estrategias se consideran las componentes principales [@sec-PCA], la eliminación recursiva de parámetros RFE [@sec-RFE] y un método ad-hoc diseñado en base a los espectros del problema [@sec-S3B]. 
+La estrategia más simple para resolver el problema anterior consiste en reducir el número de parámetros del modelo mediante algún criterio de selección, y emplear el modelo de regresión sobre el set reducido. Dentro de esta estrategias se consideran las componentes principales [@sec-PCA], la eliminación recursiva de parámetros RFE [@sec-RFE] y un método ad-hoc diseñado en base a los espectros del problema [@sec-S3B]. 
 
+Componentes principales: El análisis de componentes principales (PCA) consiste en ajustar un subespacio afín de menor dimensión a un conjunto de puntos de datos en un espacio de mayor dimensión. Dada una variable aleatoria multivariante $\textbf{x}\in \mathbb{R}^D$ con media cero y un número entero $d<D$, los $d$ "componentes principales" $\textbf{p}$ se definen como los $d$ componentes lineales no correlacionados de $\textbf{x}$, [@Wilks2011]
+$$p_i=\textbf{u}_i^T \ x_i \ \ \ \ \ \ i=1...d$$
+donde la varianza  de $p_i$ debe ser maximizada ajo las condiciones de ortogonalidad $\textbf{u}_i^T \ \textbf{u}_i=1 \ \forall \ i$ y de máxima varianza 
+
+$$var[p_1]>var[p_2]>...>var[p_d]>0$$ 
 
 ```{r eval=FALSE, include=TRUE}
 #  
@@ -199,25 +234,6 @@ Subset$s3b$nvars <- length(VARS)
 Subset$s3b$Plot.Spectra <- HC0
 ```
 
-Las ordenadas de la figura siguiente muestra los valores de los parámetros `F100` a `F400` del dataset y las abscisas presentan la variable continua $f [Hz]$ equivalente al rango discreto $f=100,101 ... 400$
-
-```{r include=TRUE }
-#| label: fig-Spectra
-#| layout-ncol: 1
-#| fig-cap: "Ordenadas espectrales de cada parámetro del modelo para el set de testeo ()."
-DT <- DATASET$DT
-DATA <- SX[n %in% sample(1:nrow(DT),size=7)]
-
-HC0 <- buildHCPlot(
-  LEGEND=TRUE,
-  COLORS=hcl.colors(n=8,palette="Plasma"),
-  LAYOUT="vertical",
-  XLOG = FALSE,YLOG = TRUE,XREV=FALSE,YREV=FALSE,
-  XT="fn",YT="Sn ",
-  CURVE=DATA[,.(ID=n,X=f,Y=S)]
-)
-HC0
-```
 
 
 
@@ -249,19 +265,22 @@ $$\hat {\boldsymbol{\beta}}_{enet}(\lambda)  =  \underset{\beta}{\mathrm{argmin}
 Excepto en el caso de Ridge, en donde es posible obtener directamente los coeficientes mediante la resolución de un sistema lineal de ecuaciones [-@eq-E6], en la regularización LASSO y Elastic-Net las ecuaciones del mínimo local [-@eq-E7] y [-@eq-E8] no son lineales y deben resolverse mediante métodos numéricos.  En sección [-@sec-ENET] se obtiene el valor óptimo de los coeficientes $\lambda$ y $\alpha$ mediante validación cruzada del modelo de regresión de Elastic-Net mediante mediante las librerías `elasticnet::enet()`, `glmnet::glmnet()`  y `caret::train()`. 
 
 
-<!-- ## Regresión no-paramétrica  -->
+## Regresión no-paramétrica
 
-<!-- La tercer estrategia consiste en emplear métodos de regresión no-lineales que emplean internamente etapas de selección de variables, pero no requieren una formulación paramétrica explícita, aunque sea posible identificar el grado de explicación de la varianza de los parámetros del dataset. En un modelo no-paramétrico, no se establecen restricciones acerca de la función de distribución de la media condicional $E[Y/X]$ -->
+La tercer estrategia consiste en emplear métodos de regresión que no requieren una formulación paramétrica explícita, y por lo tanto no están condicionados por el número de parámetros. 
 
-<!-- Regresión basada en kernels (knn) -->
+En un modelo no-paramétrico, no se establecen restricciones acerca de la función de distribución de la media condicional $E[Y/X]$
+
+En este trabajo, se analizaran los modelos de regresión basados en núcleos (`knn()`), y modelos basados en árboles de decisión como el Random Forest.
+Ambas formulaciones encuentran internamente un set de parámetros óptimo y no requieren una etapa previa de pre-selección, aunque sigue siendo posible identificar el grado de explicación de la varianza de los parámetros del dataset.  
+Los modelos mencionados son no-paramétricos 
 
 
-<!-- Regresión basada en árboles de decisión (RandomForest) -->
 
 
 # Entrenamiento de modelos
-## Datasets
-## Hiperparámetros y C.V.
+<!-- ## Datasets -->
+<!-- ## Hiperparámetros y C.V. -->
 ## Modelos de regresión
 
 ### Regresión lineal con eliminación recursiva de parámetros {#sec-RFE}
@@ -365,23 +384,23 @@ Las figuras que siguen presentan los resultados del entrenamiento de un modelo d
 ## Discusión de Resultados
 
 
-https://topepo.github.io/caret/
+<!-- https://topepo.github.io/caret/ -->
 
-https://bookdown.org/egarpor/PM-UC3M/
+<!-- https://bookdown.org/egarpor/PM-UC3M/ -->
 
-bagging
-https://bradleyboehmke.github.io/HOML/
+<!-- bagging -->
+<!-- https://bradleyboehmke.github.io/HOML/ -->
 
-https://github.com/topepo/APM_Figures
+<!-- https://github.com/topepo/APM_Figures -->
 
-Smooth spectra:
-https://guifh.github.io/RNIR 
+<!-- Smooth spectra: -->
+<!-- https://guifh.github.io/RNIR  -->
 
-https://glmnet.stanford.edu/index.html
-https://glmnet.stanford.edu/articles/glmnet.html
+<!-- https://glmnet.stanford.edu/index.html -->
+<!-- https://glmnet.stanford.edu/articles/glmnet.html -->
 
-Elastic Net
+<!-- Elastic Net -->
 
-https://bookdown.org/egarpor/PM-UC3M/glm-shrink.html
+<!-- https://bookdown.org/egarpor/PM-UC3M/glm-shrink.html -->
 
-https://bradleyboehmke.github.io/HOML/knn.html
+<!-- https://bradleyboehmke.github.io/HOML/knn.html -->
