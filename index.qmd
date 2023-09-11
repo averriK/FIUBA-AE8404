@@ -1,6 +1,6 @@
-# Introducción
+# Selección de modelos de regresión 
 
-```{r echo=FALSE,include=FALSE,message=FALSE,warning=FALSE}
+```{r eval=TRUE,echo=FALSE,include=FALSE,message=FALSE,warning=FALSE}
 # rm(list=ls())
 source("R/setup.R")
 source("R/buildDataset.R")
@@ -12,22 +12,20 @@ SX <- DATASET$SX
 P <- 0.80
 MODEL <- readRDS(file=paste0("data/Model-P=",round(100*P,digits=0),".Rds"))
 RESULTS <- readRDS(file="data/Results.Rds")
+SUBSET <- readRDS(file=paste0("data/Subset-P=",round(100*P,digits=0),".Rds"))
 ```
+## Introducción
 
-## Planteo del problema
+
+### Planteo del problema
 
 Los siguientes datos corresponden a un trabajo para determinar la composición de un conjunto de vasijas de vidrio de un yacimiento arqueológico. Como el análisis espectrométrico es más económico que un análisis químico, se procuró calibrar el primero para que reemplace al segundo. Con este objetivo se tomaron muestras de `r nrow(Xo)` vasijas, a las que se realizaron espectrometrias de rayos X sobre 1920 frecuencias, y análisis de laboratorio para determinar el contenido de `r ncol(Yo)` compuestos químicos. Los datos de la espectrometria se reportaron en el archivo `Vessel_X.txt` para un rango de frecuencias significativas comprendido entre 100 y 400 Hz. Los contenidos de los `r ncol(Yo)` compuestos químicos de las vasijas se reportaron en el archivo `Vessel_Y.txt`. El compuesto químico de interés en el estudio es el Óxido de Sodio `Na2O`y se reporta en la primer columna del archivo. El objetivo del presente trabajo es comparar los diferentes métodos de predicción vistos en el curso de 2023 y encontrar el modelo óptimo para predecir la composición de `Na2O` a partir de una muestra dada por su espectro en frecuencias.
 
-## Análisis de los datos
+### Análisis de los datos
 
-El dataset contiene `r nrow(Xo)` filas que representan el número de observaciones (Vasijas) y `r ncol(Xo)` columnas que representa el número de instancias o parámetros de cada observación, representadas en este caso por un espectro continuo de frecuencias. El análisis de los datos de entrada resulta en un dataset con `r ncol(Xo)` parámetros y `r nrow(Xo)` observaciones $(p>>N)$. El tipo de datos particular (espectrometría) determina que todos los parámetros de cada observación están correlacionados a través de un espectro continuo de frecuencias. 
+El dataset contiene `r nrow(Xo)` filas que representan el número de observaciones (Vasijas) y `r ncol(Xo)` columnas que representa el número de instancias o parámetros de cada observación, representadas en este caso por un espectro continuo de frecuencias. El análisis de los datos de entrada resulta en un dataset con `r ncol(Xo)` parámetros y `r nrow(Xo)` observaciones $(p>>N)$. El tipo de datos particular (espectrometría) determina que todos los parámetros de cada observación están correlacionados a través de un espectro continuo de frecuencias.
 
-
-
-
-
-Todos los parámetros forman parte de un _espectro de respuesta_ y por lo tanto están correlacionados. Las ordenadas de la figura [-@fig-Spectra] muestra los valores de 10 parámetros arbitrarios del dataset, donnde las abscisas presentan la variable continua $f [Hz]$ equivalente al rango discreto $f=100,101 ... 400$. 
-
+Todos los parámetros forman parte de un *espectro de respuesta* y por lo tanto están correlacionados. Las ordenadas de la figura [-@fig-Spectra] muestra los valores de 10 parámetros arbitrarios del dataset, donnde las abscisas presentan la variable continua $f [Hz]$ equivalente al rango discreto $f=100,101 ... 400$.
 
 ```{r include=TRUE }
 #| label: fig-Spectra
@@ -47,58 +45,63 @@ HC0 <- buildHCPlot(
 HC0
 ```
 
-La figura [-@fig-CP1] muestra un gráfico de la matriz de correlaciones entre los parámetros del modelo. Las zonas claras representan datos con poca o nula correlación. Se puede observar en el gráfico anterior que la gran mayoría de los datos están altamente correlacionados, con muy pocos datos de baja o nula correlación. 
+La figura [-@fig-CP1] muestra un gráfico de la matriz de correlaciones entre los parámetros del modelo. Las zonas claras representan datos con poca o nula correlación. Se puede observar en el gráfico anterior que la gran mayoría de los datos están altamente correlacionados, con muy pocos datos de baja o nula correlación.
 
 ![Matriz de correlaciones de los parámetros.](data/corr.png){#fig-CP1}
 
-
 Las estrategias convencionales de eliminación de parámetros altamente correlacionados no pueden aplicarse en este tipo de problemas.
 
-# Metodología
+## Metodología
 
-## Modelos de Regresión 
+### Modelos de Regresión
 
 El primer paso para la selección de modelos óptimos es entender cómo se relaciona cada parámetro del modelo $X_k$ con la variable (escalar) de respuesta $Y=f(X)=Na_2O$ a traves de un modelo de regresión. En esta sección se analizan los conceptos mínimos asociados a modelos paramétricos y no-paramétricos.
 
-Si $Y$ es una variable aleatoria escalar y $\textbf X=(X_1,..X_k,...X_p)^T$ es un vector de variables aleatorias, la respuesta $Y$ puede estimarse mediante la media condicional $E[Y|\textbf X]=E[Y]$[^index-1] y un error aleatorio $\varepsilon$ en la forma $Y=E[Y|\textbf X] +{\varepsilon}$, donde ${\varepsilon}$ es una variable aleatoria $\varepsilon$ con esperanza nula $E[ \varepsilon]=0$ y varianza constante $var[\varepsilon]\approx\sigma^2$ (homocedasticidad)[^index-2]. 
-
-El objetivo principal del análisis predictivo es encontrar una *función de regresión* (escalar) $\phi(\textbf x)$ que permita estimar la media condicional $E[Y|\textbf X=\textbf x]$ para cualquier realización de $\textbf{X}$ según un *modelo de regresión* $Y\approx E[Y|\textbf X ]$
+Si $Y$ es una variable aleatoria escalar y $\textbf X=(X_1,..X_k,...X_p)^T$ es un vector de variables aleatorias, la respuesta $Y$ puede estimarse mediante la media condicional $E[Y|\textbf X]=E[Y]$[^index-1] y un error aleatorio $\varepsilon$ en la forma $Y=E[Y|\textbf X] +{\varepsilon}$, donde ${\varepsilon}$ es una variable aleatoria $\varepsilon$ con esperanza nula $E[ \varepsilon]=0$ y varianza constante $var[\varepsilon]\approx\sigma^2$ (homocedasticidad)[^index-2].
 
 [^index-1]: Si aceptamos que $Y$ y $\textbf X$ son variables aleatorias independientes $E[Y|\textbf X ]=E[Y]$.
 
 [^index-2]: Si se asume que la variable aleatoria $\varepsilon$ sigue una distribución *normal*, $\varepsilon \sim \mathcal{N}(0,\sigma^2)$, entonces la media condicional $Y|\textbf x$ también seguirá distribución de probabilidad normal $Y|\textbf x \sim \mathcal{N}(\phi(\textbf x),\sigma^2 \textbf I)$.
 
+El objetivo principal del análisis predictivo es encontrar una *función de regresión* (escalar) $\phi(\textbf x)$ que permita estimar la media condicional $E[Y|\textbf X=\textbf x]$ para cualquier realización de $\textbf{X}$ según un *modelo de regresión* $Y\approx E[Y|\textbf X ]$
+
 $$Y = \phi(\textbf{x}) +{\varepsilon}$$ {#eq-E1}
 
-## Regresión paramétrica
+### Regresión paramétrica
 
-La forma más simple que puede asumirse para la función de regresión $\phi(\textbf x)$ es una combinación lineal entre un número finito $p+1$ de parámetros y las $p$ variables independientes $\textbf{x}$. A esta familia de modelos paramétricos se los conoce como *modelos (multivariados) de regresión lineal* [-@eq-E2] donde el vector $\boldsymbol{\beta}=(\beta_0,...,\beta_{p})^T$ agrupa los $p+1$ (en este caso `r ncol(Xo)`) parámetros del modelo y el vector fila $\textbf{X}^i=[1 \ \ \textbf{x}^i]$[^index-4] representa una observación arbitraria del dataset. 
+La forma más simple que puede asumirse para la función de regresión $\phi(\textbf x)$ es una combinación lineal entre un número finito $p+1$ de parámetros y las $p$ variables independientes $\textbf{x}$. A esta familia de modelos paramétricos se los conoce como *modelos (multivariados) de regresión lineal* [-@eq-E2] donde el vector $\boldsymbol{\beta}=(\beta_0,...,\beta_{p})^T$ agrupa los $p+1$ (en este caso `r ncol(Xo)`) parámetros del modelo y el vector fila $[X]^i=[1 \ \ \textbf{x}^i]$[^index-3] representa una observación arbitraria del dataset.
 
-En el contexto de aprendizaje estadístico, se requiere seleccionar diferentes algoritmos de entrenamiento que permitan estimar los parámetros [^index-3] a partir de un set de datos $\mathcal{D}=\{\textbf{x}^i,y^i \}$ de entrenamiento con $i=1...n$ donde $\textbf{x}^i=(x_1^i,x_2^i,,...x_p^i,)^T$ e $y^i$ son observaciones de las variables aleatorias $\textbf{X}$ e $Y$ respectivamente.
-
-$$\phi(\textbf{ x}^i)= \beta_0+\sum_{k=1}^{p} \beta_k \ x_k^i=  \textbf{X}^{i} · \boldsymbol{\beta}$$ {#eq-E2}
-
-La selección del modelo óptimo se basa en general en hacer mínimo el error de predicción del modelo. Existen varias métricas del error del modelo. La elección de la mediana condicional $E[Y|X]$ como un estimador de la respuesta, determina un error aleatorio $\varepsilon=Y-E[Y|X]$ desconocido, para el cual asumimos simplemente que serán variables aleatorias independientes[^index-3] con esperanza nula $E[\varepsilon^i]=0 \ \forall i$ y varianza constante $var[\varepsilon^i]=\sigma^2 \ \forall i$.
-
-[^index-3]: Si asumimos que las diferentes realizaciones de la respuesta $Y=y^i$ son variables aleatorias independientes, $\varepsilon^i$ serán también variables aleatorias independientes. Si asumimos además que siguen una distribución *normal* $\varepsilon^i \sim \mathcal{N}(0,\sigma^2)$, la independencia queda garantizada asegurando que los errores tengan correlación nula $cov[\varepsilon_i,\varepsilon_j]\approx 0$. La suma del cuadrado de los residuos (RSS por sus siglas en ingles) es una medida del error del ajuste y se define como $RSS = \|\textbf{r} \|^2= \textbf{r}^T·\textbf{r}$ donde $\textbf{r}=(r^1,...,r^n)^T$ es el vector de los *residuos* entre las observaciones de la respuesta $\textbf Y$ y el estimador de la esperanza condicional $\phi(\textbf{x})$
-
-$$RSS(\boldsymbol{\beta}) \approx (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})^T · (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})$${#eq-E3}
-
-Si entendemos al cuadrado los residuos $(r^i)^2$ como muestras de una variable aleatoria $R^2$, el *error cuadrático medio* (ECM, o MSE según sus siglas en inglés) se define como esperanza de esta variable segun $MSE=E[R^2]\approx 1/n \ RSS$. EL método de *cuadrados mínimos ordinarios (OLS)* permite obtener una estimación de los parámetros del modelo $\{\boldsymbol{\beta}\}$ que hacen mínimo al cuadrado de los residuos.  Derivando respecto del vector de parámetros e igualando a cero la expresión [-@eq-E3] se obtiene un estimador de los parámetros del modelo $\boldsymbol{\hat \beta}$ según OLS resulta 
-
-$$\hat {\boldsymbol{\beta}}_{lm}  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace RSS(\boldsymbol{\beta}) \rbrace = \left([X]^T·[X]\right)^{-1} ·[X]^T· \textbf{y}$${#eq-E4}
-
-donde $\hat {\boldsymbol{\beta}}$ es el estimador de los $p+1$ parámetros del modelo, $[X]$ es la *matriz de diseño* del modelo [^index-4] con $n$ filas y $p+1$ columnas que se construye a partir del conjunto de datos de entrenamiento $\{\textbf{x}^i,y^i \}$. La matriz $[X]^T·[X]$ es un arreglo de $(p+1)(p+1)$ que debe ser cumplir la condicion de no-singular para asegurar que la solución sea única.
-
-[^index-4]: $$[X] = \begin{bmatrix}
+[^index-3]: $$[X] = \begin{bmatrix}
     1& x_1^1& x_2^1& ...& x_p^1&\\
     1& x_1^2& x_2^2& ...& x_p^2&\\
     ...& ... \\
     1& x_1^n& x_2^n& ...& x_p^n&\\
     \end{bmatrix}$$
 
+En el contexto de aprendizaje estadístico, se requiere seleccionar diferentes algoritmos de entrenamiento que permitan estimar los parámetros [^index-4] a partir de un set de datos $\mathcal{D}=\{\textbf{x}^i,y^i \}$ de entrenamiento con $i=1...n$ donde $\textbf{x}^i=(x_1^i,x_2^i,,...x_p^i,)^T$ e $y^i$ son observaciones de las variables aleatorias $\textbf{X}$ e $Y$ respectivamente.
 
+[^index-4]: Si asumimos que las diferentes realizaciones de la respuesta $Y=y^i$ son variables aleatorias independientes, $\varepsilon^i$ serán también variables aleatorias independientes. Si asumimos además que siguen una distribución *normal* $\varepsilon^i \sim \mathcal{N}(0,\sigma^2)$, la independencia queda garantizada asegurando que los errores tengan correlación nula $cov[\varepsilon_i,\varepsilon_j]\approx 0$. La suma del cuadrado de los residuos (RSS por sus siglas en ingles) es una medida del error del ajuste y se define como $RSS = \|\textbf{r} \|^2= \textbf{r}^T·\textbf{r}$ donde $\textbf{r}=(r^1,...,r^n)^T$ es el vector de los *residuos* entre las observaciones de la respuesta $\textbf Y$ y el estimador de la esperanza condicional $\phi(\textbf{x})$
 
+$$\phi(\textbf{ x}^i)= \beta_0+\sum_{k=1}^{p} \beta_k \ x_k^i=  [X]^{i} · \boldsymbol{\beta}$$ {#eq-E2}
+
+La selección del modelo óptimo se basa en general en hacer mínimo el error de predicción del modelo. Existen varias métricas del error del modelo. La elección de la mediana condicional $E[Y|X]$ como un estimador de la respuesta, determina un error aleatorio $\varepsilon=Y-E[Y|X]$ desconocido, para el cual asumimos simplemente que serán variables aleatorias independientes[^index-5] con esperanza nula $E[\varepsilon^i]=0 \ \forall i$ y varianza constante $var[\varepsilon^i]=\sigma^2 \ \forall i$.
+
+[^index-5]: Si asumimos que las diferentes realizaciones de la respuesta $Y=y^i$ son variables aleatorias independientes, $\varepsilon^i$ serán también variables aleatorias independientes. Si asumimos además que siguen una distribución *normal* $\varepsilon^i \sim \mathcal{N}(0,\sigma^2)$, la independencia queda garantizada asegurando que los errores tengan correlación nula $cov[\varepsilon_i,\varepsilon_j]\approx 0$. La suma del cuadrado de los residuos (RSS por sus siglas en ingles) es una medida del error del ajuste y se define como $RSS = \|\textbf{r} \|^2= \textbf{r}^T·\textbf{r}$ donde $\textbf{r}=(r^1,...,r^n)^T$ es el vector de los *residuos* entre las observaciones de la respuesta $\textbf Y$ y el estimador de la esperanza condicional $\phi(\textbf{x})$
+
+$$RSS(\boldsymbol{\beta}) \approx (\textbf{y}-[X]· \boldsymbol{\beta})^T · (\textbf{y}-[X]· \boldsymbol{\beta})$$ {#eq-E3}
+
+Si entendemos al cuadrado los residuos $(r^i)^2$ como muestras de una variable aleatoria $R^2$, el *error cuadrático medio* (ECM, o MSE según sus siglas en inglés) se define como esperanza de esta variable segun $MSE=E[R^2]\approx 1/n \ RSS$. EL método de *cuadrados mínimos ordinarios (OLS)* permite obtener una estimación de los parámetros del modelo $\{\boldsymbol{\beta}\}$ que hacen mínimo al cuadrado de los residuos. Derivando respecto del vector de parámetros e igualando a cero la expresión [-@eq-E3] se obtiene un estimador de los parámetros del modelo $\boldsymbol{\hat \beta}$ según OLS resulta
+
+$$\hat {\boldsymbol{\beta}}_{lm}  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace RSS(\boldsymbol{\beta}) \rbrace = \left([X]^T·[X]\right)^{-1} ·[X]^T· \textbf{y}$$ {#eq-E4}
+
+donde $\hat {\boldsymbol{\beta}}$ es el estimador de los $p+1$ parámetros del modelo, $[X]$ es la *matriz de diseño* del modelo [^index-6] con $n$ filas y $p+1$ columnas que se construye a partir del conjunto de datos de entrenamiento $\{\textbf{x}^i,y^i \}$. La matriz $[X]^T·[X]$ es un arreglo de $(p+1)(p+1)$ que debe ser cumplir la condicion de no-singular para asegurar que la solución sea única.
+
+[^index-6]: $$[X] = \begin{bmatrix}
+    1& x_1^1& x_2^1& ...& x_p^1&\\
+    1& x_1^2& x_2^2& ...& x_p^2&\\
+    ...& ... \\
+    1& x_1^n& x_2^n& ...& x_p^n&\\
+    \end{bmatrix}$$
 
 ```{r}
 XD <- cbind(1,Xo) |> as.matrix() |> unname()
@@ -107,24 +110,27 @@ A <- t(XD)%*%XD
 
 En un escenario en donde se tienen casi tantos parámetros como observaciones, el problema tiende a estar sobredeterminado, los autovalores de la matriz $[X]^T·[X]$ serán muy pequeños y linealmente dependientes, y el determinante de la matriz $[X]^T·[X]$ será cercano a cero. Las estrategias para resolver este problema se analizan en los parágrafos subsiguientes
 
+### Selección de parámetros
 
-## Selección de parámetros
+La estrategia más simple para resolver el problema anterior consiste en reducir el número de parámetros del modelo mediante algún criterio de selección, y emplear el modelo de regresión sobre el set reducido. Dentro de esta estrategias se consideran las componentes principales [@sec-PCA], la eliminación recursiva de parámetros RFE [@sec-RFE] y un método ad-hoc diseñado en base a los espectros del problema [@sec-S3B].
 
-La estrategia más simple para resolver el problema anterior consiste en reducir el número de parámetros del modelo mediante algún criterio de selección, y emplear el modelo de regresión sobre el set reducido. Dentro de esta estrategias se consideran las componentes principales [@sec-PCA], la eliminación recursiva de parámetros RFE [@sec-RFE] y un método ad-hoc diseñado en base a los espectros del problema [@sec-S3B]. 
+#### Componentes principales (PCA)
 
-Componentes principales: El análisis de componentes principales (PCA) consiste en ajustar un subespacio afín de menor dimensión a un conjunto de puntos de datos en un espacio de mayor dimensión. Dada una variable aleatoria multivariante $\textbf{x}\in \mathbb{R}^D$ con media cero y un número entero $d<D$, los $d$ "componentes principales" $\textbf{p}$ se definen como los $d$ componentes lineales no correlacionados de $\textbf{x}$, [@Wilks2011]
-$$p_i=\textbf{u}_i^T \ x_i \ \ \ \ \ \ i=1...d$$
-donde la varianza  de $p_i$ debe ser maximizada ajo las condiciones de ortogonalidad $\textbf{u}_i^T \ \textbf{u}_i=1 \ \forall \ i$ y de máxima varianza 
+El análisis de componentes principales (PCA) consiste en ajustar un subespacio afín de menor dimensión a un conjunto de puntos de datos en un espacio de mayor dimensión. Dada una variable aleatoria multivariante $\textbf{x}\in \mathbb{R}^D$ con media cero y un número entero $d<D$, los $d$ "componentes principales" $\textbf{p}$ se definen como los $d$ componentes lineales no correlacionados de $\textbf{x}$, [@Wilks2011] $$p_i=\textbf{u}_i^T \ x_i \ \ \ \ \ \ i=1...d$$ donde la varianza de $p_i$ debe ser maximizada ajo las condiciones de ortogonalidad $\textbf{u}_i^T \ \textbf{u}_i=1 \ \forall \ i$ y de máxima varianza
 
-$$var[p_1]>var[p_2]>...>var[p_d]>0$$ 
+$$var[p_1]>var[p_2]>...>var[p_d]>0$$
+
+El algoritmo que sigue, resume el procedimiento anterior, en donde se seleccionan las primeras `NCP`componentes que explican el 98% de la varianza. 
 
 ```{r eval=FALSE, include=TRUE}
-#  
-# Principal Component Analysiss  ----
-# 
 
-AUX <- buildDataset()
-DT <- AUX$DT
+# **************************************************************** 
+# Principal Component Analysis  ----
+# ****************************************************************
+DATASET <- buildDataset()
+DT <- DATASET$DT
+SX <- DATASET$SX
+SY <- DATASET$SY
 Xo <- DT[,-c("Na2O")]
 Yo <- DT$Na2O
 
@@ -134,21 +140,33 @@ EigenValues <- SD^2
 VarExp <- EigenValues/sum(EigenValues)
 CumVarExp <- cumsum(VarExp)
 NCP <- length(CumVarExp[CumVarExp<=0.98] )
-XP <- MDL$x[,1:NCP] |> as.data.table()
+# XP <- MDL$x[,1:NCP] |> as.data.table()
+XP <- MDL$x |> as.data.table()
+
 DTP <- cbind(XP,Na2O=Yo) |> as.data.table()
 
-Subset$pca <- list()
-Subset$pca$DTP <- DTP
-Subset$pca$NCP <- NCP
-Subset$pca$CumVarExp <- CumVarExp
+SUBSET$pca <- list()
+SUBSET$pca$DTP <- DTP
+SUBSET$pca$NCP <- NCP
+SUBSET$pca$CumVarExp <- CumVarExp
+SUBSET$pca$nvars <- NCP
+SUBSET$pca$vars <- colnames(XP)[seq(1,NCP)]
+
 ```
 
-Eliminación recursiva: La eliminación recursiva del algoritmo RFE se basa en árboles de decisión que particionan el conjunto de paràmetros buscan el mejor predictor y el mejor punto de división para que los resultados sean más homogéneos en cada nueva partición. Si un predictor no se utiliza en ninguna partición, es funcionalmente independiente de la ecuación de predicción y se excluye del modelo.
+Para un dataset de entrenamiento con el `r paste0(P*100,"%")`
+de los datos, el subset PCA retiene `r SUBSET$pca$NCP` componentes principales. Para otras particiones, ver la sección @sec-SUM
+
+#### Eliminación recursiva (RFE)
+
+Otra estrategia para reducir el número de dimensiones del modelo, consiste en seleccionar diferentes subsets de variables mediante la eliminación recursiva. Para un número de parámetros menor a 30, existen algoritmos como `leaps::leaps()`que seleccionan variables agregando (forward) o quitando (backward) una nueva variable en cada iteración o bien probando todas las combinaciones posibles (best subsets). Para el dataset actual, con 300 parámetros, este algoritmo no es aplicable y se emplea una versión del mismo basada en árboles de decisión, La eliminación recursiva del algoritmo RFE se basa en árboles de decisión que particionan el conjunto de paràmetros buscan el mejor predictor y el mejor punto de división para que los resultados sean más homogéneos en cada nueva partición. Si un predictor no se utiliza en ninguna partición, es funcionalmente independiente de la ecuación de predicción y se excluye del modelo. El algoritmo siguiente presenta el esquema de selección de parámetros mediante RFE
 
 ```{r eval=FALSE, include=TRUE}
-#  
+# **************************************************************** 
 # Backwards Feature Selection (recursive Feature Elimination)  ----
-# 
+# ****************************************************************
+DATASET <- buildDataset()
+DT <- DATASET$DT
 DT.train <- DT[idx,]
 DT.test  <- DT[-idx,]
 CV.SET <- rfe(Na2O ~ ., 
@@ -167,22 +185,41 @@ VARS.RFE <- predictors(CV.SET)
 # "codo" con valor minimo (36)
 plot(CV.SET$results$Variables,CV.SET$results$RMSE)
 
-Subset$rfe <- list()
-Subset$rfe$vars <- predictors(CV.SET)
-Subset$rfe$nvars <- CV.SET$bestSubset
+SUBSET$rfe <- list()
+SUBSET$rfe$vars <- predictors(CV.SET)
+SUBSET$rfe$nvars <- CV.SET$bestSubset
 ```
 
+Para un dataset de entrenamiento con el `r paste0(P*100,"%")` de los datos, el subset RFE retiene `r SUBSET$rfe$nvars` parámetros. Para otras particiones, ver la sección @sec-SUM
 
+#### Análisis de máximos locales (S3B)
 
+Esta metodología puede aplicarse con espectros de frecuencias, y tiene como objetivo identificar los "modos" principales mediante una aproximación del espectro (es decir, los parámetros correlacionados) mediante splines cúbicas, y luego identificar numéricamente los máximos y mínimos. Cada máximo representa es un parámetro que se retiene y el resto de los parámetros se elimina. El procedimiento numérico propuesto es el siguiente:
 
-Componentes espectrales: Esta metodología es una aproximación numérica simple propuesta por el autor, que se basa en la naturaleza espectral de los datos, y tiene como objetivo identificar los "modos" principales mediante un metodo numerico sencillo basado en splines. Se puede demostrar que el número de "modos principales" que se obtienen mediante esta metodología es igual al número de componentes principales
+> -   Asociar cada parámetro (ordenado) a la frecuencia numérica correspondiente
+> -   Particionar el subset de entrenamiento en `NFOLD` conjuntos y tomar una muestra de `n/NFOLD` elementos donde `n` es el número total de muestras del subset de entrenamiento (#1)
+> -   Sobre la muestra de `n/NFOLD` espectros, ajustar un modelo de spline cúbica (#2)
+> -   Sobre la curva spline ajustada a las muestras, encontrar los índices (frecuencias) de máximos locales igualando a cero la segunda derivada numérica mediante `i <-  which(diff(sign(diff(DATA$S)))==-2)+1` (#4)
+> -   Agregar el set de máximos locales encontrado al subset buscado (#5)
+> -   Repetir el proceso `REPEAT` veces. El array de índices de máximos locales contiene los parámetros (modos) que registraron máximos locales
+> -   Para evitar la repetición de frecuencias muy cercanas entre sí, eliminar del subset las 5 frecuencias contiguas al modo principal (#6)
+> -   Agregar la frecuencia de 100 Hz, que no se detecta como maáximo local con este algoritmo, pero claramente es un modo principal
+
+El algoritmo boostrap de splines cúbicos (S3B) en el cuadro que sigue, implementa esta estrategia. La figura siguiente, presenta los espectros del subset de entrenamiento, y los máximos locales encontrados en las sucesivas repeticiones de la validación cruzada.
 
 ```{r eval=FALSE, include=TRUE}
-#  
+# **************************************************************** 
 # Filtros basados en splines (S3B)  ----
-# 
-# Approach B: Un subset por el promedio de todos los samples
+# ****************************************************************
+P_SET <- c(0.70,0.75,0.8,0.85,0.9,0.95)
+P <- P_SET[3]
+idx <- createDataPartition(DT$Na2O, p = P, list = FALSE)
+Subset <- list()
 
+DATASET <- buildDataset()
+DT <- DATASET$DT
+SX <- DATASET$SX
+SY <- DATASET$SY
 SX.train <- SX[n %in% idx,]
 SX.test  <- SX[!(n %in% idx),]
 SY.train <- SY[idx,]
@@ -195,19 +232,19 @@ NFOLDS <- 10 # Numero de Folds: 9 A 54
 REPEAT <- 100
 k <- 1
 while(k<REPEAT){
-  SAMPLE <- SX.train[n %in% sample(x=n,size=round(P*180/NFOLDS)),.(f,S)] 
-  MDL  <- smooth.spline(x=SAMPLE$f,y=SAMPLE$S)
-  AUX <- predict(MDL)
+  SAMPLE <- SX.train[n %in% sample(x=n,size=round(180/NFOLDS)),.(f,S)] #1
+  MDL  <- smooth.spline(x=SAMPLE$f,y=SAMPLE$S) #2
+  AUX <- predict(MDL) #3
   DATA <- data.table(f=AUX$x,S=AUX$y)
-  i <-  which(diff(sign(diff(DATA$S)))==-2)+1
-  LMX <- c(LMX,i) |> unique()
+  i <-  which(diff(sign(diff(DATA$S)))==-2)+1 #4
+  LMX <- c(LMX,i) |> unique() #5
   
   k <- k+1
 }
 # Agregar primer frecuencia (es un maximo)
-LMX <- c(1,LMX) |> sort(decreasing = FALSE)
+LMX <- c(1,LMX) |> sort(decreasing = FALSE) (#6)
 # remover frecuencias contiguas
-I <- !(abs(diff(LMX)) <=5)
+I <- !(abs(diff(LMX)) <=5) (#7)
 LMX <- LMX[I]
 VARS <- paste0("F", Freq[LMX])
 
@@ -228,65 +265,178 @@ HC0 <- buildHCPlot(
 )
 # HC0
 
-Subset$s3b <- list()
-Subset$s3b$vars <- VARS
-Subset$s3b$nvars <- length(VARS)
-Subset$s3b$Plot.Spectra <- HC0
+SUBSET$s3b <- list()
+SUBSET$s3b$vars <- VARS
+SUBSET$s3b$nvars <- length(VARS)
+SUBSET$s3b$Plot.Spectra <- HC0
+
 ```
 
+```{r include=TRUE }
+#| label: fig-s3b_0
+#| layout-ncol: 1
+#| fig-cap: "identifiación de máximos locales mediante boostrap de splnes" 
 
+SUBSET$s3b$Plot.Spectra
+```
 
+Para un dataset de entrenamiento con el `r paste0(P*100,"%")` de los datos, el subset S3B retiene `r SUBSET$s3b$nvars` parámetros y es el modelo paramétrico que emplea el mínimo número de parametros. Para otras particiones, ver la sección @sec-SUM
 
+### Regularización de parámetros {#sec-SEL}
 
+Otra estrategia para resolver la sobre-determinación del modelo consiste en regularizar la matriz $[X]^T·[X]$ imponiendo una restricción de tamaño a los coeficientes. La regresión de Ridge [-@HastieEA2009] reduce los coeficientes de regresión $\boldsymbol{\beta}$ imponiendo una penalización a su tamaño. Los coeficientes Ridge minimizan una suma de cuadrados residual penalizada. Si se centran las variables, $x_k^i=x_k^i-\bar x^i$, y se estima por separado el sesgo del modelo $\beta_0\approx \bar y=1/N·\sum_{1}^{N} {y^i}$, la matriz de diseño $[X]$ se reduce a una matriz de $p$ columnas y el vector de coeficientes Error cuadrático medio penalizado resulta igual a [-@eq-E5]
 
-## Regularización de parámetros {#sec-SEL}
+$$RSS(\boldsymbol{\beta},\lambda) = (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})^T · (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})+\lambda \boldsymbol{\beta}^T \boldsymbol{\beta}$$ {#eq-E5}
 
+A partir de esta expresión los coeficientes restantes $\boldsymbol{\beta}$ de la regresión de Ridge se pueden obtener directamente según [-@eq-E6] , donde $\lambda$ es un hiperparámetro de penalización a calibrar mediante validación cruzada.
 
+$$\hat {\boldsymbol{\beta}}_{ridge}(\lambda)  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace \sum_{i=1}^{N}(y^i-\beta_0-\sum_{j=1}^{p} x_j^i \beta_j)^2+\lambda\sum_{j=1}^{p}(\beta_j)^2 \rbrace = \left([X]^T·[X] +\lambda \textbf{I} \right)^{-1} ·[X]^T· \textbf{y}$$ {#eq-E6}
 
-Una estrategia para resolver este problema consiste en regularizar la matriz $[X]^T·[X]$ imponiendo una restricción de tamaño a los coeficientes.  La regresión de Ridge [-@HastieEA2009] reduce los coeficientes de regresión $\boldsymbol{\beta}$ imponiendo una penalización a su tamaño. Los coeficientes Ridge minimizan una suma de cuadrados residual penalizada. Si se centran las variables, $x_k^i=x_k^i-\bar x^i$, y se estima por separado el sesgo del modelo  $\beta_0\approx \bar y=1/N·\sum_{1}^{N} {y^i}$, la matriz de diseño $[X]$ se reduce a una matriz de $p$ columnas y el vector de coeficientes Error cuadrático medio penalizado resulta igual a [-@eq-E5]
+También es posible regularizar mediante una penalización LASSO (Least Absolute Shrinkage and Selection Operator), que en lugar de emplear una norma $L_2$ (valor cuadrático) utiliza una norma $L_1$ (valor absoluto) para los coeficientes.
 
-$$RSS(\boldsymbol{\beta},\lambda) = (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})^T · (\textbf{y}-[\textbf{X}]· \boldsymbol{\beta})+\lambda \boldsymbol{\beta}^T \boldsymbol{\beta}$${#eq-E5}
+$$\hat {\boldsymbol{\beta}}_{lasso}(\lambda)  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace \sum_{i=1}^{N}(y^i-\beta_0-\sum_{j=1}^{p} x_j^i \beta_j)^2+\lambda\sum_{j=1}^{p} |{\beta_j}| \rbrace $$ {#eq-E7}
 
-A partir de esta expresión los coeficientes restantes $\boldsymbol{\beta}$ de la regresión de Ridge se pueden obtener directamente según [-@eq-E6] , donde $\lambda$ es un hiperparámetro de penalización a calibrar mediante validación cruzada. 
+En sección [-@sec-LASSO] y [-@sec-RIDGE] se obtiene el valor óptimo del coeficiente $\lambda$ mediante validación cruzada del modelo de regresión de LASSO mediante las librerías `elasticnet::enet()` y `caret::train()`.
 
-$$\hat {\boldsymbol{\beta}}_{ridge}(\lambda)  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace \sum_{i=1}^{N}(y^i-\beta_0-\sum_{j=1}^{p} x_j^i \beta_j)^2+\lambda\sum_{j=1}^{p}(\beta_j)^2 \rbrace = \left([X]^T·[X] +\lambda \textbf{I} \right)^{-1} ·[X]^T· \textbf{y}$${#eq-E6}
+Finalmente, la penalidad del Elastic-Net propone una combinación lineal entre ambos factores, y es un compromiso entre las bondades de la penalización Ridge y el LASSO [-@eq-E8]. El modelo Elastic-Net elimina variables como el LASSO, y contrae (penaliza) juntos los coeficientes de predictores correlacionados como el Ridge [-@HastieEA2009].
 
- También es posible regularizar mediante una penalización LASSO (Least Absolute Shrinkage and Selection Operator), que en lugar de emplear una norma $L_2$ (valor cuadrático) utiliza una norma $L_1$ (valor absoluto) para los coeficientes. 
+$$\hat {\boldsymbol{\beta}}_{enet}(\lambda)  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace \sum_{i=1}^{N}(y^i-\beta_0-\sum_{j=1}^{p} x_j^i \beta_j)^2+\lambda(\sum_{j=1}^{p}\alpha+ (1-\alpha) |{\beta_j}|) \rbrace $$ {#eq-E8}
 
-$$\hat {\boldsymbol{\beta}}_{lasso}(\lambda)  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace \sum_{i=1}^{N}(y^i-\beta_0-\sum_{j=1}^{p} x_j^i \beta_j)^2+\lambda\sum_{j=1}^{p} |{\beta_j}| \rbrace $${#eq-E7}
+Excepto en el caso de Ridge, en donde es posible obtener directamente los coeficientes mediante la resolución de un sistema lineal de ecuaciones [-@eq-E6], en la regularización LASSO y Elastic-Net las ecuaciones del mínimo local [-@eq-E7] y [-@eq-E8] no son lineales y deben resolverse mediante métodos numéricos. En sección [-@sec-ENET] se obtiene el valor óptimo de los coeficientes $\lambda$ y $\alpha$ mediante validación cruzada del modelo de regresión de Elastic-Net mediante mediante las librerías `elasticnet::enet()`, `glmnet::glmnet()` y `caret::train()`.
 
+### Regresión no-paramétrica
 
-En sección [-@sec-LASSO] y [-@sec-RIDGE] se obtiene el valor óptimo del coeficiente $\lambda$ mediante validación cruzada del modelo de regresión de LASSO mediante las librerías `elasticnet::enet()` y `caret::train()`. 
+La tercer estrategia consiste en emplear métodos de regresión que no requieren una formulación paramétrica explícita, y por lo tanto no están condicionados por el número de parámetros. En un modelo no-paramétrico, no se establecen restricciones acerca de la función de distribución de la media condicional $E[Y/X]$. Los residuos del modelo no requieren seguir una distribución normal.
 
-Finalmente, la penalidad del Elastic-Net propone una combinación lineal entre ambos factores, y es un compromiso entre las bondades de la penalización Ridge y el LASSO [-@eq-E8]. El modelo Elastic-Net elimina variables como el LASSO, y contrae (penaliza) juntos los coeficientes de predictores correlacionados como el Ridge [-@HastieEA2009]. 
+En este trabajo, se analizaran modelos no paramétricos de regresión basados en núcleos mediante la librería (`kknn::kknn()`), y basados en boostraps de árboles de decisión (`randomForest::rf()`). Ambas formulaciones encuentran internamente un set de parámetros óptimo y no requieren una etapa previa de pre-selección, aunque sigue siendo posible identificar el grado de explicación de la varianza de los parámetros del dataset.
 
-$$\hat {\boldsymbol{\beta}}_{enet}(\lambda)  =  \underset{\beta}{\mathrm{argmin}} \     \lbrace \sum_{i=1}^{N}(y^i-\beta_0-\sum_{j=1}^{p} x_j^i \beta_j)^2+\lambda(\sum_{j=1}^{p}\alpha+ (1-\alpha) |{\beta_j}|) \rbrace $${#eq-E8}
+## Entrenamiento de modelos
 
-Excepto en el caso de Ridge, en donde es posible obtener directamente los coeficientes mediante la resolución de un sistema lineal de ecuaciones [-@eq-E6], en la regularización LASSO y Elastic-Net las ecuaciones del mínimo local [-@eq-E7] y [-@eq-E8] no son lineales y deben resolverse mediante métodos numéricos.  En sección [-@sec-ENET] se obtiene el valor óptimo de los coeficientes $\lambda$ y $\alpha$ mediante validación cruzada del modelo de regresión de Elastic-Net mediante mediante las librerías `elasticnet::enet()`, `glmnet::glmnet()`  y `caret::train()`. 
-
-
-## Regresión no-paramétrica
-
-La tercer estrategia consiste en emplear métodos de regresión que no requieren una formulación paramétrica explícita, y por lo tanto no están condicionados por el número de parámetros. 
-
-En un modelo no-paramétrico, no se establecen restricciones acerca de la función de distribución de la media condicional $E[Y/X]$
-
-En este trabajo, se analizaran los modelos de regresión basados en núcleos (`knn()`), y modelos basados en árboles de decisión como el Random Forest.
-Ambas formulaciones encuentran internamente un set de parámetros óptimo y no requieren una etapa previa de pre-selección, aunque sigue siendo posible identificar el grado de explicación de la varianza de los parámetros del dataset.  
-Los modelos mencionados son no-paramétricos 
-
-
-
-
-# Entrenamiento de modelos
 <!-- ## Datasets -->
+
 <!-- ## Hiperparámetros y C.V. -->
-## Modelos de regresión
 
 ### Regresión lineal con eliminación recursiva de parámetros {#sec-RFE}
 
 Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión lineal con el subset reducido mediante RFE, donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tal como está implementado (basado en un subset reducido) no tiene hiperparámetros. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$rfe_lm$MSE.train |> round(digits=3)` y `r MODEL$rfe_lm$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$rfe_lm$R2.train |> round(digits=3)` y `r MODEL$rfe_lm$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
 
+`P.min`
+
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 6. lm()+RFE  ----
+# ****************************************************************
+VARS <- Subset$rfe$vars
+COLS <- c(VARS,"Na2O")
+DT.train <- DT[idx,..COLS]
+DT.test  <- DT[-idx,..COLS]
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "lm",
+                # preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL)
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+VARIMP[,VI:=VI/max(VI)]
+
+
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+
+
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$rfe_lm  <- MDL
+
+```
 
 {{< include qmd/rfe_lmPlots.qmd >}}
 
@@ -294,56 +444,1304 @@ Las figuras que siguen presentan los resultados del entrenamiento de un modelo d
 
 Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión lineal empleando un subset reducido de componentes principales donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tal como está implementado (basado en un subset reducido) no tiene hiperparámetros. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$pca_lm$MSE.train |> round(digits=3)` y `r MODEL$pca_lm$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$pca_lm$R2.train |> round(digits=3)` y `r MODEL$pca_lm$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
 
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 7. lm()+pca  ----
+# ****************************************************************
+DTP <- Subset$pca$DTP
+NCP <- Subset$pca$NCP
+VARS <- Subset$pca$vars[seq(1,NCP)]
+COLS <- c(VARS,"Na2O")
+
+DT.train <- DTP[idx,..COLS]
+DT.test  <- DTP[-idx,..COLS]
+
+CV.MDL <- train(Na2O ~ .,  data=DT.train,
+                method = "lm",
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL
+                
+)  
+# En el contexto de CARET, el parametro a optimizar en lm() es el intercept
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+# VARIMP <- data.table(AUX,ID=row.names(AUX))
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_remove(row.names(AUX),pattern = "PC")))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="PC",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=ID,Y=VI)] #[X>=0.001],
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$pca_lm  <- MDL
+
+```
+
 {{< include qmd/pca_lmPlots.qmd >}}
 
-Complementariamente, se analizó un modelo de regresión por componentes principales empleando el paquete `pcr`, que efectúa internamente la selección de variables y se compararon resultados con el modelo lineal. EL modelo tiene como único hiperparámetro el número de componentes. El modelo tiene como hiperparámetro el número de componentes `ncomp`. La validación cruzada estimó el hiperparámero `ncomp=` `r MODEL$pcr$CV.MDL$finalModel$tuneValue$ncomp`.  El modelo de regresión PCR reportó un error cuadrático medio $MSE\approx$ `r MODEL$pcr$MSE.train |> round(digits=3)` y `r MODEL$pcr$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$pcr$R2.train |> round(digits=3)` y `r MODEL$pcr$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+Complementariamente, se analizó un modelo de regresión por componentes principales empleando el paquete `pcr`, que efectúa internamente la selección de variables y se compararon resultados con el modelo lineal. EL modelo tiene como único hiperparámetro el número de componentes. El modelo tiene como hiperparámetro el número de componentes `ncomp`. La validación cruzada estimó el hiperparámero `ncomp=` `r MODEL$pcr$CV.MDL$finalModel$tuneValue$ncomp`. El modelo de regresión PCR reportó un error cuadrático medio $MSE\approx$ `r MODEL$pcr$MSE.train |> round(digits=3)` y `r MODEL$pcr$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$pcr$R2.train |> round(digits=3)` y `r MODEL$pcr$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
 
+```{r include=TRUE,eval=FALSE}
+# ****************************************************************
+# 5. PCR  ----
+# ****************************************************************
+DT.train <- DT[idx,]
+DT.test  <- DT[-idx,]
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "pcr",
+                preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL,
+                tuneGrid=expand.grid(ncomp=10:50),
+                tuneLength=20
+)  
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=TRUE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+VARIMP[,VI:=VI/max(VI)]
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$pcr  <- MDL
+
+
+```
 
 {{< include qmd/pcrPlots.qmd >}}
-
-
 
 ### Regresión lineal mediante componentes espectrales {#sec-S3B}
 
 Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión lineal con el subset S3B, donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tal como está implementado (basado en un subset optimizado) no tiene hiperparámetros. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$s3b_lm$MSE.train |> round(digits=3)` y `r MODEL$s3b_lm$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$s3b_lm$R2.train |> round(digits=3)` y `r MODEL$s3b_lm$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
 
+```{r include=TRUE,eval=FALSE}
+# ****************************************************************
+# 8. lm()+S3B  ----
+# ****************************************************************
+VARS <- Subset$s3b$vars
+COLS <- c(VARS,"Na2O")
+DT.train <- DT[idx,..COLS]
+DT.test  <- DT[-idx,..COLS]
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "lm",
+                # preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL)
+
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=TRUE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+VARIMP[,VI:=VI/100]
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$s3b_lm  <- MDL
+```
 
 {{< include qmd/s3b_lmPlots.qmd >}}
-
 
 ### Regresión mediante regularización Ridge (L2) {#sec-RIDGE}
 
 Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión RIDGE donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene un único hiperparámetro $\lambda$. La validación cruzada estimó el hiperparámero $\lambda\approx$ `r MODEL$ridge$CV.MDL$finalModel$tuneValue$lambda |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$ridge$MSE.train |> round(digits=3)` y `r MODEL$ridge$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$ridge$R2.train |> round(digits=3)` y `r MODEL$ridge$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
 
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 1. ridge  ----
+# ****************************************************************
+# ridge es insensible a la eleccion del CV
+DT.train <- DT[idx,]
+DT.test  <- DT[-idx,]
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "ridge",
+                preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl =CV.CONTROL,
+                tuneLength=20
+)
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+LAMBDA <- CV.MDL$finalModel$tuneValue$lambda
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$ridge <- MDL
+```
+
 {{< include qmd/ridgePlots.qmd >}}
 
-### Regresión mediante regularización LASSO (L1){#sec-LASSO}
+### Regresión mediante regularización LASSO (L1) {#sec-LASSO}
 
 Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión LASSO donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene un único hiperparámetro $\lambda$. La validación cruzada estimó un $\lambda\approx$ `r MODEL$lasso$CV.MDL$finalModel$tuneValue$fraction |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$lasso$MSE.train |> round(digits=3)` y `r MODEL$lasso$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$lasso$R2.train |> round(digits=3)` y `r MODEL$lasso$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
 
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 2. lasso  ----
+# ****************************************************************
+DT.train <- DT[idx,]
+DT.test  <- DT[-idx,]
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "lasso",
+                # preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl =CV.CONTROL
+)
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+LAMBDA <- CV.MDL$finalModel$tuneValue$fraction
+
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$lasso  <- MDL
+
+```
+
 {{< include qmd/lassoPlots.qmd >}}
 
+### Regresión mediante regularización mixta (elasticnet) {#sec-ENET}
+
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión E-NET mediante el paquete `enet`, donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene como hiperparámetros $\alpha$ y $\lambda$. La validación cruzada estimó los hiperparámeros $\lambda\approx$ `r MODEL$enet$CV.MDL$finalModel$tuneValue$lambda |> round(digits=3)` y $\alpha\approx$ `r MODEL$enet$CV.MDL$finalModel$tuneValue$fraction |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$enet$MSE.train |> round(digits=3)` y `r MODEL$enet$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$enet$R2.train |> round(digits=3)` y `r MODEL$enet$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 4. enet ----
+# ****************************************************************
+DT.train <- DT[idx,]
+DT.test  <- DT[-idx,]
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "enet",
+                preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL,
+                tuneLength = 20
+)  
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+LAMBDA <- CV.MDL$finalModel$tuneValue$lambda
+ALPHA <- CV.MDL$finalModel$tuneValue$fraction
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
 
 
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
 
-### Regresión mediante regularización mixta (Elastic-Net) {#sec-ENET}
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
 
-Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión E-NET mediante el paquete `enet`, donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene como hiperparámetros $\alpha$  y $\lambda$. La validación cruzada estimó los hiperparámeros $\lambda\approx$ `r MODEL$enet$CV.MDL$finalModel$tuneValue$lambda |> round(digits=3)` y $\alpha\approx$ `r MODEL$enet$CV.MDL$finalModel$tuneValue$fraction |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$enet$MSE.train |> round(digits=3)` y `r MODEL$enet$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$enet$R2.train |> round(digits=3)` y `r MODEL$enet$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
 
+#Plots 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$enet  <- MDL
+
+```
 
 {{< include qmd/enetPlots.qmd >}}
+### Regresión mediante regularización mixta (glmnet) {#sec-GLMNET}
 
-A modo de comparación y análisis de sensibilidad, se analizó un modelo E-NET mediante el paquete `glmnet`
-La validación cruzada estimó los hiperparámeros $\lambda\approx$ `r MODEL$glmnet$CV.MDL$finalModel$tuneValue$lambda |> round(digits=3)` y $\alpha\approx$ `r MODEL$glmnet$CV.MDL$finalModel$tuneValue$alpha |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$glmnet$MSE.train |> round(digits=3)` y `r MODEL$glmnet$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$glmnet$R2.train |> round(digits=3)` y `r MODEL$glmnet$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+A modo de comparación y análisis de sensibilidad, se analizó un modelo E-NET mediante el paquete `glmnet` La validación cruzada estimó los hiperparámeros $\lambda\approx$ `r MODEL$glmnet$CV.MDL$finalModel$tuneValue$lambda |> round(digits=3)` y $\alpha\approx$ `r MODEL$glmnet$CV.MDL$finalModel$tuneValue$alpha |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$glmnet$MSE.train |> round(digits=3)` y `r MODEL$glmnet$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$glmnet$R2.train |> round(digits=3)` y `r MODEL$glmnet$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 5. glmnet ----
+# ****************************************************************
+DT.train <- DT[idx,]
+DT.test  <- DT[-idx,]
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "glmnet",
+                preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL
+)  
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+LAMBDA <- CV.MDL$finalModel$tuneValue$lambda
+ALPHA <- CV.MDL$finalModel$tuneValue$alpha
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$glmnet  <- MDL
+
+```
 
 {{< include qmd/glmnetPlots.qmd >}}
 
-
 ### Regresión basada en kernels (knn) {#sec-KNN}
 
-Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión K-NN donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo.El modelo tiene como único hiperparámetro el número de núcleos $k_{max}$. La validación cruzada estimó l$k_{max}\approx$ `r MODEL$knn$CV.MDL$finalModel$tuneValue$kmax |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$knn$MSE.train |> round(digits=3)` y `r MODEL$knn$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$knn$R2.train |> round(digits=3)` y `r MODEL$knn$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión K-NN donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo.El modelo tiene como único hiperparámetro el número de núcleos $k_{max}$. La validación cruzada estimó $k_{max}\approx$ `r MODEL$knn$CV.MDL$finalModel$tuneValue$kmax |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$knn$MSE.train |> round(digits=3)` y `r MODEL$knn$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$knn$R2.train |> round(digits=3)` y `r MODEL$knn$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** ---
+# 9. knn   ----
+# ****************************************************************
+
+DT.train <- DT[idx,]
+DT.test  <- DT[-idx,]
+CV.MDL <- train(Na2O ~ .,  data=DT.train,
+                method = "kknn",
+                metric = "RMSE",
+                preprocess=PP.CONTROL,
+                trControl = CV.CONTROL,
+                tuneLength=20
+)
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+
+
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="k-nn",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$knn  <- MDL
+```
 
 {{< include qmd/knnPlots.qmd >}}
+
+El modelo `knn` empleó el dataset de datos con todos los parámetros. A modo de comparación, se analizaron los modelos de regresión basados en núcleos, pero empleando los datasets reducidos PCA, RFE y S3B, presentados en la sección [-@sec-SEL].
+
+### Regresión basada en kernels (knn) con subset PCA 
+
+Para el subset transformado a componentes principales (PCA), la validación cruzada estimó $k_{max}\approx$ `r MODEL$pca_knn$CV.MDL$finalModel$tuneValue$kmax |> round(digits=3)` y el modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$pca_knn$MSE.train |> round(digits=3)` y `r MODEL$pca_knn$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$pca_knn$R2.train |> round(digits=3)` y `r MODEL$pca_knn$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 12. knn()+PCA  ----
+# ****************************************************************
+DT.train <- DT[idx]
+DT.test  <- DT[-idx]
+
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "kknn",
+                preprocess=c("pca"),
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL
+)
+
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=TRUE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+VARIMP[,VI:=VI/100]
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="PC",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+Model$pca_knn <- list()
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$pca_knn  <- MDL
+```
+
+{{< include qmd/pca_knnPlots.qmd >}}
+
+### Regresión basada en kernels (knn) con subset RFE
+
+Para el subset reducido RFE, que seleccionó `r SUBSET$rfe$nvars` variables, la validación cruzada estimó $k_{max}\approx$ `r MODEL$rfe_knn$CV.MDL$finalModel$tuneValue$kmax |> round(digits=3)` y el modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$rfe_knn$MSE.train |> round(digits=3)` y `r MODEL$rfe_knn$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$rfe_knn$R2.train |> round(digits=3)` y `r MODEL$rfe_knn$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+```{r include=TRUE,eval=FALSE}
+# ****************************************************************
+# 10. knn()+RFE  ----
+# ****************************************************************
+VARS <- Subset$rfe$vars
+COLS <- c(VARS,"Na2O")
+DT.train <- DT[idx,..COLS]
+DT.test  <- DT[-idx,..COLS]
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "kknn",
+                preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL)
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+VARIMP[,VI:=VI/max(VI)]
+
+
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$rfe_knn  <- MDL
+```
+
+{{< include qmd/rfe_knnPlots.qmd >}}
+
+### Regresión basada en kernels (knn) con subset S3B
+
+-   Finalmente, para el subset reducido S3B, que retiene `r SUBSET$s3b$nvars` variables, la validación cruzada estimó $k_{max}\approx$ `r MODEL$s3b_knn$CV.MDL$finalModel$tuneValue$kmax |> round(digits=3)` y el modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$s3b_knn$MSE.train |> round(digits=3)` y `r MODEL$s3b_knn$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$s3b_knn$R2.train |> round(digits=3)` y `r MODEL$s3b_knn$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+```{r include=TRUE,eval=FALSE}
+# ****************************************************************
+# 12. knn()+S3B  ----
+# ****************************************************************
+VARS <- Subset$s3b$vars
+COLS <- c(VARS,"Na2O")
+DT.train <- DT[idx,..COLS]
+DT.test  <- DT[-idx,..COLS]
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "kknn",
+                preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL
+)
+
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=TRUE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+VARIMP[,VI:=VI/100]
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$s3b_knn  <- MDL
+```
+
+{{< include qmd/s3b_knnPlots.qmd >}}
 
 <!-- ## Núcleos(knn) - Subset PCA -->
 
@@ -357,46 +1755,505 @@ Las figuras que siguen presentan los resultados del entrenamiento de un modelo d
 
 <!-- {{< include qmd/s3b_knnPlots.qmd >}} -->
 
-
 ### Regresión basada en árboles de decisión (RandomForest) {#sec-RF}
 
+Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión RF donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene como único hiperparámetro el número de ramas `mtry`. La validación cruzada estimó `mtry=` `r MODEL$rf$CV.MDL$finalModel$tuneValue$mtry |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$rf$MSE.train |> round(digits=3)` y `r MODEL$rf$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$rf$R2.train |> round(digits=3)` y `r MODEL$rf$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
 
-Las figuras que siguen presentan los resultados del entrenamiento de un modelo de regresión RF donde se muestran los residuos, las predicciones, la distribución de los residuos del modelo y la importancia de cada parámetro para el subconjunto de entrenamiento y testeo. El modelo tiene como único hiperparámetro el número de ramas `mtry`. La validación cruzada estimó  `mtry=` `r MODEL$rf$CV.MDL$finalModel$tuneValue$mtry |> round(digits=3)`. El modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$rf$MSE.train |> round(digits=3)` y `r MODEL$rf$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$rf$R2.train |> round(digits=3)` y `r MODEL$rf$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 13. rf  ----
+# ****************************************************************
+
+DT.train <- DT[idx,]
+DT.test  <- DT[-idx,]
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "rf",
+                preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL,
+                tuneLength=20)
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+# RMSE <- CV.MDL$results$RMSE[I]
+
+# RF arroja mejores resultados con 10-folds (datasets mas chicos) que con 3-folds (dataset mas grandes)
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=TRUE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="Random Forest",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$rf  <- MDL
+
+```
 
 {{< include qmd/rfPlots.qmd >}}
 
+El modelo ``` rf`` reportado utilizó un dataset de entrenamiento y testeo que incluía todos los parámetros. El modelo ```knn\` empleó el dataset de datos con todos los parámetros. A modo de comparación, se analizaron además los datasets reducidos PCA, RFE y S3B.
+
+-   Para el subset transformado a componentes principales (PCA), la validación cruzada estimó `mtry=` `r MODEL$pca_rf$CV.MDL$finalModel$tuneValue$mtry |> round(digits=3)`y el modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$pca_rf$MSE.train |> round(digits=3)` y `r MODEL$pca_rf$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$pca_rf$R2.train |> round(digits=3)` y `r MODEL$pca_rf$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 15. rf()+PCA  ----
+# ****************************************************************
+DT.train <- DT[idx]
+DT.test  <- DT[-idx]
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "rf",
+                preprocess=c("pca"),
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL)
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+VARIMP[,VI:=VI/max(VI)]
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$pca_rf  <- MDL
+
+```
+
+-   Para el subset reducido RFE, que emplea `r SUBSET$rfe$nvars` variables, la validación cruzada estimó `mtry=` `r MODEL$rfe_rf$CV.MDL$finalModel$tuneValue$mtry |> round(digits=3)`y el modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$rfe_rf$MSE.train |> round(digits=3)` y `r MODEL$rfe_rf$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$rfe_rf$R2.train |> round(digits=3)` y `r MODEL$rfe_rf$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 14. rf()+RFE  ----
+# ****************************************************************
+VARS <- Subset$rfe$vars
+COLS <- c(VARS,"Na2O")
+DT.train <- DT[idx,..COLS]
+DT.test  <- DT[-idx,..COLS]
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "rf",
+                preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL)
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=FALSE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+VARIMP[,VI:=VI/max(VI)]
+
+
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$rfe_rf  <- MDL
+```
+
+-   Finalmente, para el subset reducido S3B, que emplea `r SUBSET$s3b$nvars` variables, la validación cruzada estimó `mtry=` `r MODEL$s3b_rf$CV.MDL$finalModel$tuneValue$mtry |> round(digits=3)`y el modelo de regresión reportó un error cuadrático medio $MSE\approx$ `r MODEL$s3b_rf$MSE.train |> round(digits=3)` y `r MODEL$s3b_rf$MSE.test |> round(digits=3)` y un $R^2\approx$ `r MODEL$s3b_rf$R2.train |> round(digits=3)` y `r MODEL$s3b_rf$R2.test |> round(digits=3)` para los datos de entrenamiento y testeo respectivamente.
+
+```{r include=TRUE,eval=FALSE}
+# **************************************************************** 
+# 16. rf()+S3B  ----
+# ****************************************************************
+VARS <- Subset$s3b$vars
+COLS <- c(VARS,"Na2O")
+DT.train <- DT[idx,..COLS]
+DT.test  <- DT[-idx,..COLS]
+
+CV.MDL <- train(Na2O ~ ., 
+                data = DT.train,  
+                method = "rf",
+                preprocess=PP.CONTROL,
+                metric = "RMSE",# metric ="MAE" # metric ="Rsquared" 
+                trControl = CV.CONTROL)
+
+
+I <- as.numeric(row.names(CV.MDL$bestTune))
+R2 <- CV.MDL$results$Rsquared[I]
+
+# Variable Importance
+AUX <- varImp(CV.MDL,scale=TRUE)$importance
+VARIMP <- data.table(AUX,ID=row.names(AUX),f=as.double(str_sub(row.names(AUX),2,4)))
+setnames(VARIMP,old="Overall",new="VI")
+VARIMP <- VARIMP[order(VI,decreasing = TRUE)]
+VARIMP[,VI:=VI/100]
+
+# Residuals & prediction plots
+Y <- DT.train$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.train) #Predicted Values
+RSS.train  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.train <- RSS.train/length(Y) #caret::MSE(Yp,Y)
+RMSE.train <- sqrt(MSE.train) #caret::RMSE(Yp,Y)
+TSS.train <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.train <-  1-RSS.train/TSS.train #caret::R2(Yp,Y)
+N1 <- as.vector(idx)
+DATA.train <- data.table(ID="train",Y,Yp,r=Y-Yp,n=N1 )
+
+Y <- DT.test$Na2O #True Values
+muY <- mean(Y)
+Yp <- predict(CV.MDL,newdata = DT.test) #Predicted Values
+RSS.test  <- (Y-Yp)%*%(Y-Yp) |> as.double()
+MSE.test <- RSS.test/length(Y)
+RMSE.test <- sqrt(MSE.test)
+TSS.test <- (Y-muY )%*%(Y-muY )|> as.double()
+R2.test <-  1-RSS.test/TSS.test #caret::R2(Yp,Y)
+N2 <- seq(1,nrow(DT.train)+nrow(DT.test))[-idx]
+DATA.test <- data.table(ID="test",Y,Yp,r=Y-Yp,n= N2)
+
+DATA <- rbindlist(list(DATA.train,DATA.test)) 
+
+#Plots 
+
+# Plots
+HC1 <- buildHCPlot(
+  COLORS=c("salmon"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="f[Hz]",YT="VI",
+  COLUMN=VARIMP[,.(ID="model",X=f,Y=VI)]
+)
+# HC1
+
+HC2 <- buildHCPlot(
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="n",YT="r",TIP = "ID:{point.series.name}<br> n={point.x}<br> r={point.y}",
+  YMAX=+5,YMIN=-5,
+  POINT=DATA[,.(ID,X=n,Y=r)],
+  CURVE=DATA[,.(ID="r==0",X=n,Y=0)]
+)
+# HC2
+
+HC3 <- buildHCPlot(
+  LINE="Dot",
+  COLORS=c("grey","red","blue"),# hcl.colors(n=3,palette="ag_Sunset"),
+  LAYOUT="horizontal",
+  XLOG = FALSE,YLOG = FALSE,XREV=FALSE,YREV=FALSE,
+  XT="Y",YT="Yp",
+  POINT=DATA[,.(ID,X=Y,Y=Yp)], #[X>=0.001],
+  CURVE=DATA[,.(ID="y==yp",X=Y,Y=Y)]
+)
+# HC3
+HC4 <- highchart() |> 
+  hc_add_series(data=density(DATA[ID=="train"]$r),type="area",name="train",color="blue") |> 
+  hc_add_series(data=density(DATA[ID=="test"]$r),type="area",name="test",color="red") |> 
+  hc_add_theme(hc_thm = hc_theme_hcrt()) |>
+  hc_size( height = 600) |>    hc_chart(
+    style=list(fontFamily = "Helvetica"),
+    inverted=FALSE)
+
+MDL <- list()
+MDL$Plot.VarImp <- HC1
+MDL$Plot.Residuals <- HC2
+MDL$Plot.Predictors <- HC3
+MDL$Plot.Density <- HC4
+MDL$MSE.train <- MSE.train
+MDL$MSE.test <- MSE.test
+MDL$RMSE.train <- RMSE.train
+MDL$RMSE.test <- RMSE.test
+MDL$VARIMP<- VARIMP
+MDL$R2.train<- R2.train
+MDL$R2.test<- R2.test
+MDL$RSS.train<- RSS.train
+MDL$RSS.test<- RSS.test
+MDL$CV.MDL <- CV.MDL
+MDL$DATA <- DATA
+Model$s3b_rf  <- MDL
+
+```
 
 <!-- {{< include qmd/pca_rfPlots.qmd >}} -->
 
-
 <!-- {{< include qmd/rfe_rfPlots.qmd >}} -->
-
 
 <!-- {{< include qmd/s3b_rfPlots.qmd >}} -->
 
 
-# Conclusiones
+## Selección de Modelos
+### Resumen de Resultados {#sec-SUM}
 
-## Resumen de Resultados
+<!-- Para un dataset de entrenamiento con el `r paste0(P*100,"%")` de los datos, el subset PCA retiene `r SUBSET$pca$NCP` componentes principales. -->
 
-{{< include qmd/summaryPlots.qmd >}}
+<!-- Para un dataset de entrenamiento con el `r paste0(P*100,"%")` de los datos, el subset S3B retiene `r SUBSET$s3b$nvars` parámetros. -->
 
-## Discusión de Resultados
-
+<!-- Para un dataset de entrenamiento con el `r paste0(P*100,"%")` de los datos, el subset RFE retiene `r SUBSET$rfe$nvars` parámetros. -->
 
 <!-- https://topepo.github.io/caret/ -->
 
 <!-- https://bookdown.org/egarpor/PM-UC3M/ -->
 
 <!-- bagging -->
+
 <!-- https://bradleyboehmke.github.io/HOML/ -->
 
 <!-- https://github.com/topepo/APM_Figures -->
 
 <!-- Smooth spectra: -->
+
 <!-- https://guifh.github.io/RNIR  -->
 
 <!-- https://glmnet.stanford.edu/index.html -->
+
 <!-- https://glmnet.stanford.edu/articles/glmnet.html -->
 
 <!-- Elastic Net -->
@@ -404,3 +2261,17 @@ Las figuras que siguen presentan los resultados del entrenamiento de un modelo d
 <!-- https://bookdown.org/egarpor/PM-UC3M/glm-shrink.html -->
 
 <!-- https://bradleyboehmke.github.io/HOML/knn.html -->
+
+
+
+{{< include qmd/summaryPlots.qmd >}}
+
+
+{{< include qmd/summaryTables.qmd >}}
+
+
+
+## Bibliografía {-}
+
+::: {#refs}
+:::

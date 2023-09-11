@@ -233,7 +233,7 @@ HC3
 # 
 # DATA <- MODEL$ridge$VARIMP[,.(VI=round(VI,digits=3),ID)]
 # setorderv(DATA,cols="VI",order = -1L)
-# DATA %>% head(25) %>% flextable()
+# DATA |>head(25) |>flextable()
 
 # *********************************************************-----
 # FILE <- paste0("data/Model-P=95.Rds")
@@ -410,10 +410,10 @@ HC4
 DATASET <- buildDataset()
 Xo <- DATASET$Xo
 DATA <- cor(log(Xo))
-HC10 <- hchart(DATA) %>% 
+HC10 <- hchart(DATA) |>
   hc_legend(layout = "vertical",
             align = "right",
-            verticalAlign = "top") %>% 
+            verticalAlign = "top") |>
   hc_colors(colors = hcl.colors(n=5, palette = "RdBu" ))|>
   hc_legend(
     align = "left",

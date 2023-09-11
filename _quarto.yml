@@ -10,16 +10,11 @@ execute:
 editor: 
   mode: source
 book:
-  subtitle: "Ing. Jemina García"
+  subtitle: "**Trabajo Práctico Final - Curso 2022**"
   title: "Aprendizaje Estadístico (AE8404)"
-  author: 
-    - "Alejandro Verri Kozlowski. "
-    - "Ing. Civil. Aspirante de Doctorado en Ingeniería (FIUBA) "
     
   chapters:
     - index.qmd
-    - qmd/references.qmd
-    
     
   # appendices: 
     
@@ -49,9 +44,9 @@ format:
     reference-location: margin
     citation-location: margin
     code-fold: true
-    code-summary: "Mostrar código R"
+    # code-summary: "Mostrar código R"
     # embed-resources: true
-    # self-contained-math: true
+    self-contained-math: true
     page-layout: article # article,full
     toc: true
     number-sections: false

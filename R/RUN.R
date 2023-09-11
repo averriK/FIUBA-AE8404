@@ -21,28 +21,27 @@ P <- P_SET[3]
 for(P in P_SET){
   idx <- createDataPartition(DT$Na2O, p = P, list = FALSE)
   FILE <- paste0("data/Subset-P=",round(100*P,digits=0),".Rds")
-  
-  if(file.exists(FILE)){
-    Subset <- readRDS(file=FILE)
-  } else {
-    Subset <- list()
-    
-  }
+  Subset <- list()
+  # 
+  # if(file.exists(FILE)){
+  #   Subset <- readRDS(file=FILE)
+  # } else {
+  #   Subset <- list()
+  #   
+  # }
   source("R/buildSubsets.R")
   saveRDS(Subset,file=FILE)
  
   
   FILE <- paste0("data/Model-P=",round(100*P,digits=0),".Rds")
-  if(file.exists(FILE)){
-    Model <- readRDS(file=FILE)
-  } else {
-    Model <- list()
-    
-    
-    
-  }
-  source("R/buildModels.R",echo=TRUE)
-  saveRDS(file=FILE,Model)
+  Model <- list()
+  # if(file.exists(FILE)){
+  #   Model <- readRDS(file=FILE)
+  # } else {
+  #   Model <- list()
+  # }
+  # source("R/buildModels.R",echo=TRUE)
+  # saveRDS(file=FILE,Model)
 }
 
 source("R/buildSummary.R",echo=TRUE)

@@ -1,0 +1,86 @@
+
+
+```{r include=TRUE, eval=TRUE }
+
+SDT <- RESULTS$Summary[,.(
+  ID,R2=R2.test |>round(digits=4),
+  RMSE=RMSE.test |> round(digits=3),
+  NVAR,p)]
+ 
+TBL1 <- rbindlist(list(
+  SDT[ID%in% c("pca_lm","rfe_lm","s3b_lm")][ which.min(RMSE)],
+  SDT[ID%in% c("pcr")][ which.min(RMSE)],
+  SDT[ID%in% c("knn","pca_knn","rfe_knn","s3b_knn")][ which.min(RMSE)],
+  SDT[ID%in% c("rf","pca_rf","rfe_rf","s3b_rf")][ which.min(RMSE)],
+  SDT[ID%in% c("ridge","lasso","enet","glmnet")][ which.min(RMSE)] 
+)) |>flextable() |> 
+  theme_vanilla() |> fontsize(size=10) |> 
+  align(align="center",part="all") |>
+  align(align="left",j=2) |>
+  set_table_properties(layout = "autofit") |> 
+  autofit(part="all") |> 
+  bold(part = "header")
+
+TBL2 <- rbindlist(list(
+  SDT[ID%in% c("pca_lm","rfe_lm","s3b_lm")][ which.max(R2)],
+  SDT[ID%in% c("pcr")][ which.max(R2)],
+  SDT[ID%in% c("knn","pca_knn","rfe_knn","s3b_knn")][ which.max(R2)],
+  SDT[ID%in% c("rf","pca_rf","rfe_rf","s3b_rf")][ which.max(R2)],
+  SDT[ID%in% c("ridge","lasso","enet","glmnet")][ which.max(R2)] 
+))|>flextable() |> 
+  theme_vanilla() |> fontsize(size=10) |> 
+  align(align="center",part="all") |>
+  align(align="left",j=2) |>
+  set_table_properties(layout = "autofit") |> 
+  autofit(part="all") |> 
+  bold(part = "header")
+
+
+
+
+```
+
+
+
+::: {.panel-tabset}
+
+La proporción entre datos de prueba y datos de entrenamiento es un hiperparámetro que controla el error cuadrático medio MSE y RMSE. Las tablas [-@tbl-T1] y [-@tbl-T2]  identifica las particiones óptimas que hacen mínimo al error estándar `RMSE` y hacen máximo al coeficiente de reresión `R2`.
+
+
+### RMSE
+```{r include=TRUE }
+#| label: tbl-T1
+#| tbl-cap: "Particiones óptimas del dataset para mínimo error cuadrático medio" 
+
+
+TBL1 
+
+
+```
+
+### R2
+```{r include=TRUE }
+#| label: tbl-T
+#| tbl-cap: "Particiones óptimas del dataset para máximo coeficiente de regeresión" 
+
+
+TBL2 
+```
+
+### Dataset
+
+```{r include=TRUE }
+print(RESULTS$Summary)
+```
+
+:::
+
+
+
+Alejandro Verri Kozlowki
+averri@fi.uba.ar
+
+
+<!-- -   Los modelos de regresión lineal, basados en el algoritmo `lm()` reportaron el máximo coeficiente de regresión `R2` y el mínimo error estándar `RMSE` para el subset de componentes principales PCA. -->
+
+<!-- -   Los modelos de regresión lineal, basados en el algoritmo `lm()` reportaron el máximo coeficiente de regresión `R2` y el mínimo error estándar `RMSE` para el subset de componentes principales PCA. -->

@@ -2,6 +2,11 @@
 # Filtros basados en splines (S3B)  ----
 # ****************************************************************
 # Approach B: Un subset por el promedio de todos los samples
+# P_SET <- c(0.70,0.75,0.8,0.85,0.9,0.95)
+# P <- P_SET[3]
+# idx <- createDataPartition(DT$Na2O, p = P, list = FALSE)
+# Subset <- list()
+
 DATASET <- buildDataset()
 DT <- DATASET$DT
 SX <- DATASET$SX
@@ -108,7 +113,8 @@ XP <- MDL$x |> as.data.table()
 DTP <- cbind(XP,Na2O=Yo) |> as.data.table()
 
 Subset$pca <- list()
-Subset$pca$vars <- colnames(XP)
 Subset$pca$DTP <- DTP
 Subset$pca$NCP <- NCP
 Subset$pca$CumVarExp <- CumVarExp
+Subset$pca$nvars <- NCP
+Subset$pca$vars <- colnames(XP)[seq(1,NCP)]
