@@ -10,7 +10,7 @@ execute:
 editor: 
   mode: source
 book:
-  subtitle: "**Trabajo Práctico Final - Curso 2022**"
+  subtitle: "**Facultad de Ingeniería FIUBA**"
   title: "Aprendizaje Estadístico (AE8404)"
     
   chapters:
